@@ -7,6 +7,8 @@ import {defineConfig, loadEnv} from 'vite';
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   return {
+    // use '/REPO_NAME/' for project pages; use '/' for user/org site
+    base: 'https://github.com/AlvinEH/HIIT-Pulse.git',
     plugins: [
       react(),
       tailwindcss(),
