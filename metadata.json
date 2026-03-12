@@ -1,0 +1,5 @@
+{
+  "name": "HIIT Pulse",
+  "description": "A high-intensity interval training timer with customizable work, rest, and round settings.",
+  "requestFramePermissions": []
+}
