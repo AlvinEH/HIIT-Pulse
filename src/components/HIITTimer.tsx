@@ -80,6 +80,9 @@ export default function HIITTimer() {
 
   const isFirstLoad = useRef(true);
 
+  // Track whether we've played the halfway sound for the current work phase
+  const halfwayPlayedRef = useRef(false);
+
   const fetchTimers = async () => {
     try {
       const res = await fetch('/api/timers');
@@ -204,6 +207,16 @@ export default function HIITTimer() {
       interval = setInterval(() => {
         setState((prev) => {
           const nextTime = prev.timeLeft - 1;
+          
+          // If we're in a Work phase, fire a halfway sound once when hitting the half point
+          if (prev.phase === 'work') {
+            const halfPoint = Math.floor(settings.workTime / 2);
+            if (nextTime === halfPoint && !halfwayPlayedRef.current) {
+              playBeep(880, 0.08, soundVolume, soundType);
+              halfwayPlayedRef.current = true;
+            }
+          }
+          
           if (nextTime <= 3 && nextTime > 0) {
             playBeep(330, 0.05, soundVolume, soundType);
           }
@@ -215,21 +228,12 @@ export default function HIITTimer() {
     }
 
     return () => clearInterval(interval);
-  }, [state.isActive, state.timeLeft]);
-
-  // Sync music with timer
+  }, [state.isActive, state.timeLeft, settings.workTime, soundVolume, soundType]);
+  
+  // Reset halfway flag whenever the phase, round or work duration changes
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = musicVolume;
-    }
-    if (state.isActive && playlist.length > 0 && !isMusicPlaying) {
-      audioRef.current?.play().catch(console.error);
-      setIsMusicPlaying(true);
-    } else if (!state.isActive && isMusicPlaying) {
-      audioRef.current?.pause();
-      setIsMusicPlaying(false);
-    }
-  }, [state.isActive, playlist.length, musicVolume]);
+    halfwayPlayedRef.current = false;
+  }, [state.phase, state.currentRound, settings.workTime]);
 
   const handlePhaseTransition = () => {
     setState((prev) => {
@@ -369,7 +373,7 @@ export default function HIITTimer() {
 
   const getPhaseColor = (phase: TimerPhase) => {
     switch (phase) {
-      case 'prep': return 'text-amber-400';
+      case 'prep': return 'text-red-400';
       case 'work': return 'text-emerald-400';
       case 'rest': return 'text-sky-400';
       case 'finished': return 'text-purple-400';
@@ -617,7 +621,7 @@ export default function HIITTimer() {
             onClick={toggleTimer}
             className={cn(
               "w-24 h-24 flex items-center justify-center transition-all transform active:scale-95 rounded-full border-2 border-emerald-500/20 hover:border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-500",
-              state.isActive && "bg-emerald-500/20 border-emerald-500/60 shadow-[0_0_20px_rgba(16,185,129,0.2)]"
+              getPhaseColor(state.phase)
             )}
           >
             {state.isActive ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" className="ml-2" />}
