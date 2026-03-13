@@ -1055,6 +1055,9 @@ function SettingRow({ label, value, onChange, unit = '' }: { label: string, valu
           <input
             autoFocus
             type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            autoComplete="off"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value.replace(/[^0-9]/g, ''))}
             onBlur={handleBlur}
