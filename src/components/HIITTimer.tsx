@@ -408,6 +408,25 @@ export default function HIITTimer() {
     }
   };
 
+  // total progress calculation (prep + all rounds; last round has no rest)
+  const totalDuration = settings.prepTime + settings.rounds * settings.workTime + Math.max(0, settings.rounds - 1) * settings.restTime;
+  const totalElapsed = (() => {
+    if (state.phase === 'prep') {
+      return Math.max(0, settings.prepTime - state.timeLeft);
+    }
+    if (state.phase === 'work') {
+      return settings.prepTime + (state.currentRound - 1) * (settings.workTime + settings.restTime) + Math.max(0, settings.workTime - state.timeLeft);
+    }
+    if (state.phase === 'rest') {
+      return settings.prepTime + (state.currentRound - 1) * (settings.workTime + settings.restTime) + settings.workTime + Math.max(0, settings.restTime - state.timeLeft);
+    }
+    if (state.phase === 'finished') {
+      return totalDuration;
+    }
+    return 0;
+  })();
+  const totalProgress = Math.max(0, Math.min(1, totalElapsed / Math.max(1, totalDuration)));
+
   return (
     <div className="min-h-screen bg-[#0A0A0A] text-white font-sans selection:bg-emerald-500/30 flex flex-col items-center justify-center p-6 overflow-hidden relative">
       {/* Hidden Audio Element */}
@@ -565,6 +584,7 @@ export default function HIITTimer() {
 
         {/* Progress Ring */}
         <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none">
+          {/* outer background */}
           <circle
             cx="50%"
             cy="50%"
@@ -574,6 +594,8 @@ export default function HIITTimer() {
             strokeWidth="1"
             className="text-zinc-900"
           />
+          
+          {/* outer phase progress */}
           {state.phase !== 'finished' && (
             <motion.circle
               cx="50%"
@@ -594,6 +616,30 @@ export default function HIITTimer() {
               className={cn("transition-all duration-1000 ease-linear", getPhaseColor(state.phase))}
             />
           )}
+          
+          {/* inner background (total progress) */}
+          <circle
+            cx="50%"
+            cy="50%"
+            r="40%"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1"
+            className="text-zinc-800"
+          />
+          
+          {/* inner total-progress ring (just inside the existing progress bar) */}
+          <motion.circle
+            cx="50%"
+            cy="50%"
+            r="40%"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            initial={{ strokeDashoffset: 100 }}
+            animate={{ strokeDashoffset: 100 - totalProgress * 100 }}
+            className="transition-all duration-1000 ease-linear text-zinc-600"
+          />
         </svg>
       </div>
 
