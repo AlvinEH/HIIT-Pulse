@@ -55,6 +55,8 @@ export default function HIITTimer() {
   });
   const { playPhaseTransition, playBeep } = useAudio();
 
+  const displayRound = state.phase === 'prep' ? 0 : state.currentRound;
+
   useEffect(() => {
     localStorage.setItem('hiit-sound-type', soundType);
   }, [soundType]);
@@ -438,7 +440,7 @@ export default function HIITTimer() {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 bottom-0 w-72 bg-zinc-900 border-r border-zinc-800 z-[70] p-8 flex flex-col shadow-2xl overflow-hidden"
+              className="fixed top-0 left-0 bottom-0 w-65 bg-zinc-900 border-r border-zinc-800 z-[70] p-8 flex flex-col shadow-2xl overflow-hidden"
             >
               {/* Sidebar Header Background Image */}
               {headerImage && (
@@ -453,16 +455,16 @@ export default function HIITTimer() {
                 </div>
               )}
 
-              <div className="flex justify-between items-center mb-12 relative z-10">
+              <div className="flex justify-between items-center mb-2">
                 <div className="flex flex-col">
-                  <span className="text-[10px] uppercase tracking-[0.2em] text-zinc-500 font-mono">HIIT PULSE</span>
+                  <span className="text-[12px] uppercase tracking-[0.2em] text-zinc-500 font-mono">HIIT PULSE</span>
                 </div>
                 <button onClick={() => setShowSidebar(false)} className="p-2 text-zinc-500 hover:text-white transition-colors">
                   <X size={20} />
                 </button>
               </div>
 
-              <nav className="space-y-2 relative z-10">
+              <nav className="relative z-20">
                 <SidebarButton 
                   icon={<List size={20} />} 
                   label="Saved Workouts" 
@@ -497,11 +499,6 @@ export default function HIITTimer() {
                 )}
               </nav>
 
-              <div className="mt-auto pt-8 border-t border-zinc-800">
-                <p className="text-[10px] text-zinc-600 font-mono uppercase tracking-widest">
-                  Ready for your next session?
-                </p>
-              </div>
             </motion.div>
           </>
         )}
@@ -525,6 +522,7 @@ export default function HIITTimer() {
           </button>
         </div>
       </div>
+      
 
       {/* Main Timer Display */}
       <div className="relative w-full max-w-md aspect-square flex flex-col items-center justify-center">
@@ -539,12 +537,12 @@ export default function HIITTimer() {
             <span className={cn("text-xs font-mono tracking-[0.3em] mb-2", getPhaseColor(state.phase))}>
               {getPhaseLabel(state.phase)}
             </span>
-            <span className="text-[120px] font-light leading-none tracking-tighter tabular-nums">
+            <span className="text-[110px] font-light leading-none tracking-tighter tabular-nums">
               {state.phase === 'finished' ? 'DONE' : formatTime(state.timeLeft)}
             </span>
             {state.phase !== 'finished' && (
               <span className="text-zinc-500 text-sm mt-4 tracking-widest uppercase">
-                Round {state.currentRound} / {settings.rounds}
+                Round {displayRound} / {settings.rounds}
               </span>
             )}
           </motion.div>
@@ -977,7 +975,7 @@ function SidebarButton({ icon, label, onClick }: SidebarButtonProps) {
   return (
     <button 
       onClick={onClick}
-      className="w-full flex items-center gap-4 p-4 rounded-2xl text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all group"
+      className="w-full flex items-center gap-4 py-4 rounded-2xl text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all group"
     >
       <span className="group-hover:scale-110 transition-transform duration-300">
         {icon}
