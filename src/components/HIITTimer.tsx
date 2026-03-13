@@ -624,25 +624,37 @@ export default function HIITTimer() {
             <SkipBack size={28} />
           </button>
 
-          <button 
-            onClick={toggleTimer}
-            className={cn(
-              "w-24 h-24 flex items-center justify-center transition-all transform active:scale-95 rounded-full border-2 border-emerald-500/20 hover:border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-500",
-              getPhaseColor(state.phase)
-            )}
-          >
-            {state.isActive ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" className="ml-2" />}
-          </button>
-
-          <button 
-            onClick={nextRound}
-            disabled={state.phase === 'finished'}
-            className="p-2 transition-colors text-zinc-500 hover:text-white disabled:opacity-10 disabled:cursor-not-allowed"
-            title="Next Round"
-          >
-            <SkipForward size={28} />
-          </button>
-        </div>
+          {state.phase === 'finished' ? (
+            <button
+              onClick={resetTimer}
+              title="Reset"
+              className={cn(
+                "w-24 h-24 flex items-center justify-center transition-all transform active:scale-95 rounded-full border-2 border-purple-500/20 bg-purple-500/6 text-purple-400",
+              )}
+            >
+              <RotateCcw size={36} />
+            </button>
+          ) : (
+            <button 
+              onClick={toggleTimer}
+              className={cn(
+                "w-24 h-24 flex items-center justify-center transition-all transform active:scale-95 rounded-full border-2 border-emerald-500/20 hover:border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-500",
+                getPhaseColor(state.phase)
+              )}
+            >
+              {state.isActive ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" className="ml-2" />}
+            </button>
+          )}
+ 
+           <button 
+             onClick={nextRound}
+             disabled={state.phase === 'finished'}
+             className="p-2 transition-colors text-zinc-500 hover:text-white disabled:opacity-10 disabled:cursor-not-allowed"
+             title="Next Round"
+           >
+             <SkipForward size={28} />
+           </button>
+         </div>
       </div>
 
       {/* Reset Button - Positioned at bottom */}
