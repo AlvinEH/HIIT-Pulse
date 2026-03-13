@@ -251,7 +251,8 @@ export default function HIITTimer() {
         if (prev.currentRound >= settings.rounds) {
           nextPhase = 'finished';
           nextTime = 0;
-          playPhaseTransition(true, soundVolume, soundType);
+          // play three short beeps on workout completion
+          playTripleBeep();
         } else {
           nextPhase = 'rest';
           nextTime = settings.restTime;
@@ -390,6 +391,14 @@ export default function HIITTimer() {
       case 'rest': return 'REST';
       case 'finished': return 'FINISHED';
       default: return '';
+    }
+  };
+
+  const playTripleBeep = (count = 3, intervalMs = 220) => {
+    for (let i = 0; i < count; i++) {
+      setTimeout(() => {
+        playBeep(880, 0.08, soundVolume, soundType);
+      }, i * intervalMs);
     }
   };
 
@@ -608,7 +617,7 @@ export default function HIITTimer() {
         <div className="flex items-center gap-12">
           <button 
             onClick={prevRound}
-            disabled={state.currentRound === 1 && state.phase === 'prep'}
+            disabled={state.phase === 'prep' || state.phase === 'finished'}
             className="p-2 transition-colors text-zinc-500 hover:text-white disabled:opacity-10 disabled:cursor-not-allowed"
             title="Previous Round"
           >
