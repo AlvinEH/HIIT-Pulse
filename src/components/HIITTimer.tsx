@@ -202,6 +202,12 @@ export default function HIITTimer() {
     }
   }, [settings.prepTime]);
 
+  // close settings and reset timer
+  const closeSettings = () => {
+    setShowSettings(false);
+    resetTimer();
+  };
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
 
@@ -394,7 +400,7 @@ export default function HIITTimer() {
     }
   };
 
-  const playTripleBeep = (count = 3, intervalMs = 220) => {
+  const playTripleBeep = (count = 3, intervalMs = 100) => {
     for (let i = 0; i < count; i++) {
       setTimeout(() => {
         playBeep(880, 0.08, soundVolume, soundType);
@@ -641,6 +647,7 @@ export default function HIITTimer() {
                 "w-24 h-24 flex items-center justify-center transition-all transform active:scale-95 rounded-full border-2 border-emerald-500/20 hover:border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-500",
                 getPhaseColor(state.phase)
               )}
+             title="Pause Timer"
             >
               {state.isActive ? <Pause size={48} fill="currentColor" /> : <Play size={48} fill="currentColor" className="ml-2" />}
             </button>
@@ -673,7 +680,7 @@ export default function HIITTimer() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
-            onClick={() => setShowSettings(false)}
+            onClick={closeSettings}
             className="fixed inset-0 z-50 flex items-center justify-center p-[10px] bg-black/80 backdrop-blur-sm"
           >
             <div 
@@ -683,7 +690,7 @@ export default function HIITTimer() {
               <div className="flex justify-between items-center mb-8">
                 <h2 className="text-xl font-medium">Timer Settings</h2>
                 <button 
-                  onClick={() => setShowSettings(false)} 
+                  onClick={closeSettings} 
                   className="text-zinc-500 hover:text-white transition-colors p-1"
                   aria-label="Close settings"
                 >
