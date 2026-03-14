@@ -204,6 +204,17 @@ export default function HIITTimer() {
     resetTimer();
   };
 
+  // Play/pause music with timer
+  useEffect(() => {
+    if (!audioRef.current) return;
+
+    if (state.isActive && playlist.length > 0) {
+      audioRef.current.play().catch(err => console.log('Could not play audio:', err));
+    } else {
+      audioRef.current.pause();
+    }
+  }, [state.isActive, playlist.length]);
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
 
@@ -295,8 +306,17 @@ export default function HIITTimer() {
 
   const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const audioFiles = files.filter(f => (f as File).type.startsWith('audio/')) as File[];
-    
+
+    // Filter for audio files and include the full path for sorting
+    const audioFiles = files.filter(f => {
+      const type = (f as File).type;
+      return type.startsWith('audio/') ||
+             /\.(mp3|wav|ogg|m4a|flac|aac)$/i.test(f.name);
+    }) as File[];
+
+    // Sort by full path to preserve directory structure
+    audioFiles.sort((a, b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath));
+
     const newTracks = audioFiles.map(file => ({
       file,
       url: URL.createObjectURL(file),
@@ -446,13 +466,13 @@ export default function HIITTimer() {
       )}
 
       {/* Hidden File Inputs */}
-      <input 
-        type="file" 
-        ref={fileInputRef} 
-        onChange={handleFolderSelect} 
-        multiple 
-        accept="audio/*" 
-        className="hidden" 
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFolderSelect}
+        webkitdirectory
+        multiple
+        className="hidden"
       />
 
       <input 
