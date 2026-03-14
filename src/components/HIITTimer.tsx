@@ -314,6 +314,11 @@ export default function HIITTimer() {
              /\.(mp3|wav|ogg|m4a|flac|aac)$/i.test(f.name);
     }) as File[];
 
+    if (audioFiles.length === 0) {
+      alert('No audio files found in the selected folder.');
+      return;
+    }
+
     // Sort by full path to preserve directory structure
     audioFiles.sort((a, b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath));
 
