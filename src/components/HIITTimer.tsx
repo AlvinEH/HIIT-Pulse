@@ -76,6 +76,8 @@ export default function HIITTimer() {
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [pendingMusicFiles, setPendingMusicFiles] = useState<Track[] | null>(null);
+  const [showMusicConfirm, setShowMusicConfirm] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const headerImageInputRef = useRef<HTMLInputElement>(null);
@@ -304,8 +306,28 @@ export default function HIITTimer() {
     }
   };
 
+  const isMobileDevice = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  };
+
+  const confirmMusicSelection = () => {
+    if (pendingMusicFiles && pendingMusicFiles.length > 0) {
+      setPlaylist(pendingMusicFiles);
+      setCurrentTrackIndex(0);
+      setPendingMusicFiles(null);
+      setShowMusicConfirm(false);
+    }
+  };
+
   const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+
+    // Check for folder-only selection
+    if (files.length > 0 && !files[0].webkitRelativePath) {
+      alert('Please select a folder containing music files, not individual files.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     // Filter for audio files and include the full path for sorting
     const audioFiles = files.filter(f => {
@@ -328,8 +350,14 @@ export default function HIITTimer() {
       name: file.name.replace(/\.[^/.]+$/, "")
     }));
 
-    setPlaylist(newTracks);
-    setCurrentTrackIndex(0);
+    // On mobile, show confirmation modal. On desktop, load immediately
+    if (isMobileDevice()) {
+      setPendingMusicFiles(newTracks);
+      setShowMusicConfirm(true);
+    } else {
+      setPlaylist(newTracks);
+      setCurrentTrackIndex(0);
+    }
   };
 
   const nextTrack = () => {
@@ -1074,6 +1102,53 @@ export default function HIITTimer() {
                   ))
                 )}
               </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Music Confirmation Modal (Mobile) */}
+      <AnimatePresence>
+        {showMusicConfirm && pendingMusicFiles && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            onClick={() => { setShowMusicConfirm(false); setPendingMusicFiles(null); }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-[10px] bg-black/80 backdrop-blur-sm"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-3xl p-[22px] shadow-2xl max-h-[80vh] flex flex-col"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-medium">Select This Folder</h2>
+                <button
+                  onClick={() => { setShowMusicConfirm(false); setPendingMusicFiles(null); }}
+                  className="text-zinc-500 hover:text-white transition-colors p-1"
+                  aria-label="Close confirmation"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-3 mb-6 pr-2 custom-scrollbar">
+                <p className="text-zinc-400 text-sm mb-4">
+                  Found {pendingMusicFiles.length} song{pendingMusicFiles.length !== 1 ? 's' : ''} in this folder:
+                </p>
+                {pendingMusicFiles.map((track, index) => (
+                  <div key={index} className="text-sm text-zinc-300 p-2 rounded bg-zinc-800/50">
+                    {track.name}
+                  </div>
+                ))}
+              </div>
+
+              <button
+                onClick={confirmMusicSelection}
+                className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors"
+              >
+                Select This Folder
+              </button>
             </div>
           </motion.div>
         )}
