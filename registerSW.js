@@ -1,0 +1,1 @@
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/HIIT-Pulse/sw.js', { scope: '/HIIT-Pulse/' })})}
