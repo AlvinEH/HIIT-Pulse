@@ -28,7 +28,7 @@ export default function HIITTimer() {
   const [state, setState] = useState<TimerState>({
     phase: 'prep',
     currentRound: 1,
-    timeLeft: DEFAULT_SETTINGS.prepTime,
+    timeLeft: DEFAULT_SETTINGS.prepTime * 1000,
     isActive: false,
   });
   const [showSettings, setShowSettings] = useState(false);
@@ -193,7 +193,7 @@ export default function HIITTimer() {
     setState({
       phase: 'prep',
       currentRound: 1,
-      timeLeft: settings.prepTime,
+      timeLeft: settings.prepTime * 1000,
       isActive: false,
     });
     if (audioRef.current) {
@@ -212,31 +212,39 @@ export default function HIITTimer() {
     let interval: NodeJS.Timeout;
 
     if (state.isActive && state.timeLeft > 0) {
+      let lastTick = Date.now();
       interval = setInterval(() => {
+        const now = Date.now();
+        const delta = now - lastTick;
+        lastTick = now;
+
         setState((prev) => {
-          const nextTime = prev.timeLeft - 1;
+          const nextTime = Math.max(0, prev.timeLeft - delta);
           
           // If we're in a Work phase, fire a halfway sound once when hitting the half point
           if (prev.phase === 'work') {
-            const halfPoint = Math.floor(settings.workTime / 2);
-            if (nextTime === halfPoint && !halfwayPlayedRef.current) {
+            const halfPointMs = (settings.workTime * 1000) / 2;
+            if (prev.timeLeft > halfPointMs && nextTime <= halfPointMs && !halfwayPlayedRef.current) {
               playBeep(880, 0.08, soundVolume, soundType);
               halfwayPlayedRef.current = true;
             }
           }
           
-          if (nextTime <= 3 && nextTime > 0) {
+          const prevSec = Math.ceil(prev.timeLeft / 1000);
+          const nextSec = Math.ceil(nextTime / 1000);
+          
+          if (prevSec !== nextSec && nextSec <= 3 && nextSec > 0) {
             playBeep(330, 0.05, soundVolume, soundType);
           }
           return { ...prev, timeLeft: nextTime };
         });
-      }, 1000);
-    } else if (state.isActive && state.timeLeft === 0) {
+      }, 16); // ~60fps
+    } else if (state.isActive && state.timeLeft <= 0) {
       handlePhaseTransition();
     }
 
     return () => clearInterval(interval);
-  }, [state.isActive, state.timeLeft, settings.workTime, soundVolume, soundType]);
+  }, [state.isActive, state.timeLeft <= 0, settings.workTime, soundVolume, soundType]);
   
   // Reset halfway flag whenever the phase, round or work duration changes
   useEffect(() => {
@@ -251,7 +259,7 @@ export default function HIITTimer() {
 
       if (prev.phase === 'prep') {
         nextPhase = 'work';
-        nextTime = settings.workTime;
+        nextTime = settings.workTime * 1000;
         playPhaseTransition(false, soundVolume, soundType);
       } else if (prev.phase === 'work') {
         if (prev.currentRound >= settings.rounds) {
@@ -261,13 +269,13 @@ export default function HIITTimer() {
           playTripleBeep();
         } else {
           nextPhase = 'rest';
-          nextTime = settings.restTime;
+          nextTime = settings.restTime * 1000;
           playPhaseTransition(false, soundVolume, soundType);
         }
       } else if (prev.phase === 'rest') {
         nextPhase = 'work';
         nextRound = prev.currentRound + 1;
-        nextTime = settings.workTime;
+        nextTime = settings.workTime * 1000;
         playPhaseTransition(false, soundVolume, soundType);
       }
 
@@ -334,14 +342,14 @@ export default function HIITTimer() {
   const nextRound = () => {
     setState((prev) => {
       if (prev.phase === 'prep') {
-        return { ...prev, phase: 'work', timeLeft: settings.workTime };
+        return { ...prev, phase: 'work', timeLeft: settings.workTime * 1000 };
       }
       if (prev.currentRound < settings.rounds) {
         return {
           ...prev,
           currentRound: prev.currentRound + 1,
           phase: 'work',
-          timeLeft: settings.workTime,
+          timeLeft: settings.workTime * 1000,
         };
       }
       if (prev.currentRound === settings.rounds && prev.phase !== 'finished') {
@@ -354,21 +362,21 @@ export default function HIITTimer() {
   const prevRound = () => {
     setState((prev) => {
       if (prev.phase === 'finished') {
-        return { ...prev, phase: 'work', currentRound: settings.rounds, timeLeft: settings.workTime, isActive: false };
+        return { ...prev, phase: 'work', currentRound: settings.rounds, timeLeft: settings.workTime * 1000, isActive: false };
       }
       if (prev.phase === 'rest') {
-        return { ...prev, phase: 'work', timeLeft: settings.workTime };
+        return { ...prev, phase: 'work', timeLeft: settings.workTime * 1000 };
       }
       if (prev.currentRound > 1) {
         return {
           ...prev,
           currentRound: prev.currentRound - 1,
           phase: 'work',
-          timeLeft: settings.workTime,
+          timeLeft: settings.workTime * 1000,
         };
       }
       if (prev.currentRound === 1 && prev.phase === 'work') {
-        return { ...prev, phase: 'prep', timeLeft: settings.prepTime };
+        return { ...prev, phase: 'prep', timeLeft: settings.prepTime * 1000 };
       }
       return prev;
     });
@@ -411,14 +419,15 @@ export default function HIITTimer() {
   // total progress calculation (prep + all rounds; last round has no rest)
   const totalDuration = settings.prepTime + settings.rounds * settings.workTime + Math.max(0, settings.rounds - 1) * settings.restTime;
   const totalElapsed = (() => {
+    const timeLeftSec = state.timeLeft / 1000;
     if (state.phase === 'prep') {
-      return Math.max(0, settings.prepTime - state.timeLeft);
+      return Math.max(0, settings.prepTime - timeLeftSec);
     }
     if (state.phase === 'work') {
-      return settings.prepTime + (state.currentRound - 1) * (settings.workTime + settings.restTime) + Math.max(0, settings.workTime - state.timeLeft);
+      return settings.prepTime + (state.currentRound - 1) * (settings.workTime + settings.restTime) + Math.max(0, settings.workTime - timeLeftSec);
     }
     if (state.phase === 'rest') {
-      return settings.prepTime + (state.currentRound - 1) * (settings.workTime + settings.restTime) + settings.workTime + Math.max(0, settings.restTime - state.timeLeft);
+      return settings.prepTime + (state.currentRound - 1) * (settings.workTime + settings.restTime) + settings.workTime + Math.max(0, settings.restTime - timeLeftSec);
     }
     if (state.phase === 'finished') {
       return totalDuration;
@@ -588,7 +597,7 @@ export default function HIITTimer() {
               </div>
             ) : (
               <span className="text-[110px] font-light leading-none tracking-tighter tabular-nums">
-                {formatTime(state.timeLeft)}
+                {formatTime(Math.ceil(state.timeLeft / 1000))}
               </span>
             )}
             {state.phase !== 'finished' && (
@@ -623,15 +632,15 @@ export default function HIITTimer() {
               strokeWidth="6"
               strokeDasharray="100 100"
               pathLength="100"
-              initial={{ strokeDashoffset: 100 }}
               animate={{ 
                 strokeDashoffset: 100 - (state.timeLeft / (
-                  state.phase === 'prep' ? settings.prepTime : 
+                  (state.phase === 'prep' ? settings.prepTime : 
                   state.phase === 'work' ? settings.workTime : 
-                  settings.restTime
+                  settings.restTime) * 1000
                 )) * 100 
               }}
-              className={cn("transition-all duration-1000 ease-linear", getPhaseColor(state.phase))}
+              transition={{ duration: state.isActive ? 0.05 : 0, ease: "linear" }}
+              className={cn(getPhaseColor(state.phase))}
             />
           )}
           
@@ -656,9 +665,9 @@ export default function HIITTimer() {
             strokeWidth="6"
             strokeDasharray="100 100"
             pathLength="100"
-            initial={{ strokeDashoffset: 0 }}
-            animate={{ strokeDashoffset: totalProgress * 100 }}
-            className="transition-all duration-1000 ease-linear text-purple-400/80"
+            animate={{ strokeDashoffset: 100 - totalProgress * 100 }}
+            transition={{ duration: state.isActive ? 0.05 : 0, ease: "linear" }}
+            className="text-purple-400/80"
           />
         </svg>
       </div>
