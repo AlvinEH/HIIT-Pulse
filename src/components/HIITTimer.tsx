@@ -45,10 +45,11 @@ export default function HIITTimer() {
   const [soundVolume, setSoundVolume] = useState(() => {
     const saved = localStorage.getItem('hiit-sound-volume');
     return saved !== null ? parseFloat(saved) : 0.8;
+    return saved !== null ? parseFloat(saved) : 1;
   });
   const [musicVolume, setMusicVolume] = useState(() => {
     const saved = localStorage.getItem('hiit-music-volume');
-    return saved !== null ? parseFloat(saved) : 0.3;
+    return saved !== null ? parseFloat(saved) : 0.5;
   });
   const [headerImage, setHeaderImage] = useState<string | null>(() => {
     return localStorage.getItem('hiit-header-image');
@@ -56,21 +57,6 @@ export default function HIITTimer() {
   const { playPhaseTransition, playBeep } = useAudio();
 
   const displayRound = state.phase === 'prep' ? 0 : state.currentRound;
-
-  useEffect(() => {
-    localStorage.setItem('hiit-sound-type', soundType);
-  }, [soundType]);
-
-  useEffect(() => {
-    localStorage.setItem('hiit-sound-volume', soundVolume.toString());
-  }, [soundVolume]);
-
-  useEffect(() => {
-    localStorage.setItem('hiit-music-volume', musicVolume.toString());
-    if (audioRef.current) {
-      audioRef.current.volume = musicVolume;
-    }
-  }, [musicVolume]);
 
   // Music State
   const [playlist, setPlaylist] = useState<Track[]>([]);
@@ -96,6 +82,28 @@ export default function HIITTimer() {
       return [];
     }
   };
+  
+  useEffect(() => {
+    localStorage.setItem('hiit-sound-type', soundType);
+  }, [soundType]);
+
+  useEffect(() => {
+    localStorage.setItem('hiit-sound-volume', soundVolume.toString());
+  }, [soundVolume]);
+
+  useEffect(() => {
+    localStorage.setItem('hiit-music-volume', musicVolume.toString());
+    if (audioRef.current) {
+      audioRef.current.volume = musicVolume;
+    }
+  }, [musicVolume]);
+
+  // Apply volume to audio element when it's created or tracks change
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = musicVolume;
+    }
+  }, [playlist]);
 
   const saveTimersToStorage = (timers: SavedTimer[]) => {
     try {
@@ -891,7 +899,7 @@ export default function HIITTimer() {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <span className="text-zinc-400 font-medium">Sound Type</span>
-                  <select 
+                  <select
                     value={soundType}
                     onChange={(e) => {
                       const newType = e.target.value as any;
@@ -904,6 +912,12 @@ export default function HIITTimer() {
                     <option value="bell">Bell</option>
                     <option value="whistle">Whistle</option>
                     <option value="digital">Digital</option>
+                    <option value="chime">Chime</option>
+                    <option value="ding">Ding</option>
+                    <option value="ping">Ping</option>
+                    <option value="laser">Laser</option>
+                    <option value="power-up">Power Up</option>
+                    <option value="notification">Notification</option>
                   </select>
                 </div>
 
