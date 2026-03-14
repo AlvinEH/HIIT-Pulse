@@ -804,6 +804,7 @@ export default function HIITTimer() {
                     placeholder="Timer Name" 
                     value={timerName}
                     onChange={(e) => setTimerName(e.target.value)}
+                    autoCapitalize="words"
                     className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-emerald-500"
                   />
                   <button 
