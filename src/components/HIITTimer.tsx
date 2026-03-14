@@ -491,7 +491,8 @@ export default function HIITTimer() {
         type="file"
         ref={fileInputRef}
         onChange={handleFolderSelect}
-        webkitdirectory
+        webkitdirectory=""
+        mozdirectory=""
         multiple
         className="hidden"
       />
