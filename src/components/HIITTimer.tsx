@@ -571,9 +571,26 @@ export default function HIITTimer() {
             <span className={cn("text-xs font-mono tracking-[0.3em] mb-2", getPhaseColor(state.phase))}>
               {getPhaseLabel(state.phase)}
             </span>
-            <span className="text-[110px] font-light leading-none tracking-tighter tabular-nums">
-              {state.phase === 'finished' ? 'DONE' : formatTime(state.timeLeft)}
-            </span>
+            {state.phase === 'finished' ? (
+              <div className="w-[80%] flex items-center justify-center">
+                <svg viewBox="0 0 100 35" className="w-full h-auto">
+                  <text
+                    x="50%"
+                    y="50%"
+                    dominantBaseline="central"
+                    textAnchor="middle"
+                    className="fill-current font-light tracking-tighter"
+                    style={{ fontSize: '32px' }}
+                  >
+                    DONE
+                  </text>
+                </svg>
+              </div>
+            ) : (
+              <span className="text-[110px] font-light leading-none tracking-tighter tabular-nums">
+                {formatTime(state.timeLeft)}
+              </span>
+            )}
             {state.phase !== 'finished' && (
               <span className="text-zinc-500 text-sm mt-4 tracking-widest uppercase">
                 Round {displayRound} / {settings.rounds}
@@ -591,7 +608,7 @@ export default function HIITTimer() {
             r="48%"
             fill="none"
             stroke="currentColor"
-            strokeWidth="1"
+            strokeWidth="6"
             className="text-zinc-900"
           />
           
@@ -603,8 +620,9 @@ export default function HIITTimer() {
               r="48%"
               fill="none"
               stroke="currentColor"
-              strokeWidth="2"
+              strokeWidth="6"
               strokeDasharray="100 100"
+              pathLength="100"
               initial={{ strokeDashoffset: 100 }}
               animate={{ 
                 strokeDashoffset: 100 - (state.timeLeft / (
@@ -621,24 +639,26 @@ export default function HIITTimer() {
           <circle
             cx="50%"
             cy="50%"
-            r="40%"
+            r="45%"
             fill="none"
             stroke="currentColor"
-            strokeWidth="1"
-            className="text-zinc-800"
+            strokeWidth="6"
+            className="text-zinc-900/50"
           />
           
           {/* inner total-progress ring (just inside the existing progress bar) */}
           <motion.circle
             cx="50%"
             cy="50%"
-            r="40%"
+            r="45%"
             fill="none"
             stroke="currentColor"
-            strokeWidth="2"
-            initial={{ strokeDashoffset: 100 }}
-            animate={{ strokeDashoffset: 100 - totalProgress * 100 }}
-            className="transition-all duration-1000 ease-linear text-zinc-600"
+            strokeWidth="6"
+            strokeDasharray="100 100"
+            pathLength="100"
+            initial={{ strokeDashoffset: 0 }}
+            animate={{ strokeDashoffset: totalProgress * 100 }}
+            className="transition-all duration-1000 ease-linear text-purple-400/80"
           />
         </svg>
       </div>
@@ -701,7 +721,7 @@ export default function HIITTimer() {
  
            <button 
              onClick={nextRound}
-             disabled={state.phase === 'finished'}
+             disabled={!['prep', 'work', 'rest'].includes(state.phase)}
              className="p-2 transition-colors text-zinc-500 hover:text-white disabled:opacity-10 disabled:cursor-not-allowed"
              title="Next Round"
            >
@@ -711,13 +731,15 @@ export default function HIITTimer() {
       </div>
 
       {/* Reset Button - Positioned at bottom */}
-      <button 
-        onClick={resetTimer}
-        className="fixed bottom-[25px] left-1/2 -translate-x-1/2 p-2 transition-colors text-zinc-600 hover:text-white z-50"
-        title="Reset Timer"
-      >
-        <RotateCcw size={20} />
-      </button>
+      {state.phase !== 'finished' && (
+        <button 
+          onClick={resetTimer}
+          className="fixed bottom-[25px] left-1/2 -translate-x-1/2 p-2 transition-colors text-zinc-600 hover:text-white z-50"
+          title="Reset Timer"
+        >
+          <RotateCcw size={20} />
+        </button>
+      )}
 
       {/* Timer Settings Modal */}
       <AnimatePresence>
