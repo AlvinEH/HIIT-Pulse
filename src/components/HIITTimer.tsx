@@ -322,13 +322,6 @@ export default function HIITTimer() {
   const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
 
-    // Check for folder-only selection
-    if (files.length > 0 && !files[0].webkitRelativePath) {
-      alert('Please select a folder containing music files, not individual files.');
-      if (fileInputRef.current) fileInputRef.current.value = '';
-      return;
-    }
-
     // Filter for audio files and include the full path for sorting
     const audioFiles = files.filter(f => {
       const type = (f as File).type;
@@ -350,14 +343,9 @@ export default function HIITTimer() {
       name: file.name.replace(/\.[^/.]+$/, "")
     }));
 
-    // On mobile, show confirmation modal. On desktop, load immediately
-    if (isMobileDevice()) {
-      setPendingMusicFiles(newTracks);
-      setShowMusicConfirm(true);
-    } else {
-      setPlaylist(newTracks);
-      setCurrentTrackIndex(0);
-    }
+    // Show confirmation modal on both desktop and mobile
+    setPendingMusicFiles(newTracks);
+    setShowMusicConfirm(true);
   };
 
   const nextTrack = () => {
