@@ -248,26 +248,24 @@ export default function HIITTimer() {
     touchStartYRef.current = null;
   };
 
-  const fetchTimers = async () => {
+  const fetchTimers = () => {
     try {
-      const res = await fetch('/api/timers');
-      if (res.ok) {
-        const data: SavedTimer[] = await res.json();
-        setSavedTimers(data);
-        
-        if (isFirstLoad.current) {
-          const defaultTimer = data.find(t => t.isDefault === 1);
-          if (defaultTimer) {
-            setSettings({
-              prepTime: defaultTimer.prepTime,
-              workTime: defaultTimer.workTime,
-              restTime: defaultTimer.restTime,
-              rounds: defaultTimer.rounds,
-            });
-            setState(s => ({ ...s, timeLeft: defaultTimer.prepTime }));
-          }
-          isFirstLoad.current = false;
+      const saved = localStorage.getItem('hiit-saved-timers');
+      const data: SavedTimer[] = saved ? JSON.parse(saved) : [];
+      setSavedTimers(data);
+      
+      if (isFirstLoad.current) {
+        const defaultTimer = data.find(t => t.isDefault === 1);
+        if (defaultTimer) {
+          setSettings({
+            prepTime: defaultTimer.prepTime,
+            workTime: defaultTimer.workTime,
+            restTime: defaultTimer.restTime,
+            rounds: defaultTimer.rounds,
+          });
+          setState(s => ({ ...s, timeLeft: defaultTimer.prepTime * 1000 }));
         }
+        isFirstLoad.current = false;
       }
     } catch (error) {
       console.error('Failed to fetch timers:', error);
@@ -278,64 +276,73 @@ export default function HIITTimer() {
     fetchTimers();
   }, []);
 
-  const saveTimer = async () => {
+  const saveTimer = () => {
     if (!timerName.trim()) return;
     try {
-      const res = await fetch('/api/timers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...settings, name: timerName }),
-      });
-      if (res.ok) {
-        setTimerName('');
-        fetchTimers();
-      }
+      const saved = localStorage.getItem('hiit-saved-timers');
+      const existingTimers: SavedTimer[] = saved ? JSON.parse(saved) : [];
+      
+      const newId = existingTimers.length > 0 ? Math.max(...existingTimers.map(t => t.id)) + 1 : 1;
+      const newTimer: SavedTimer = {
+        ...settings,
+        id: newId,
+        name: timerName.trim(),
+        isDefault: 0,
+        createdAt: new Date().toISOString()
+      };
+      
+      const updatedTimers = [...existingTimers, newTimer];
+      localStorage.setItem('hiit-saved-timers', JSON.stringify(updatedTimers));
+      setTimerName('');
+      fetchTimers();
     } catch (error) {
       console.error('Failed to save timer:', error);
     }
   };
 
-  const deleteTimer = async (id: number) => {
+  const deleteTimer = (id: number) => {
     try {
-      const res = await fetch(`/api/timers/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        fetchTimers();
-      }
+      const saved = localStorage.getItem('hiit-saved-timers');
+      const existingTimers: SavedTimer[] = saved ? JSON.parse(saved) : [];
+      const updatedTimers = existingTimers.filter(t => t.id !== id);
+      localStorage.setItem('hiit-saved-timers', JSON.stringify(updatedTimers));
+      fetchTimers();
     } catch (error) {
       console.error('Failed to delete timer:', error);
     }
   };
 
-  const renameTimer = async (id: number) => {
+  const renameTimer = (id: number) => {
     if (!editingName.trim()) {
       setEditingTimerId(null);
       return;
     }
     try {
-      const res = await fetch(`/api/timers/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: editingName }),
-      });
-      if (res.ok) {
-        setEditingTimerId(null);
-        fetchTimers();
-      }
+      const saved = localStorage.getItem('hiit-saved-timers');
+      const existingTimers: SavedTimer[] = saved ? JSON.parse(saved) : [];
+      const updatedTimers = existingTimers.map(t => 
+        t.id === id ? { ...t, name: editingName.trim() } : t
+      );
+      localStorage.setItem('hiit-saved-timers', JSON.stringify(updatedTimers));
+      setEditingTimerId(null);
+      fetchTimers();
     } catch (error) {
       console.error('Failed to rename timer:', error);
     }
   };
 
-  const setDefaultTimer = async (id: number, isDefault: boolean) => {
+  const setDefaultTimer = (id: number, isDefault: boolean) => {
     try {
-      const res = await fetch(`/api/timers/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isDefault: isDefault ? 1 : 0 }),
-      });
-      if (res.ok) {
-        fetchTimers();
-      }
+      const saved = localStorage.getItem('hiit-saved-timers');
+      const existingTimers: SavedTimer[] = saved ? JSON.parse(saved) : [];
+      
+      const updatedTimers = existingTimers.map(t => ({
+        ...t,
+        isDefault: isDefault && t.id === id ? 1 : 0
+      }));
+      
+      localStorage.setItem('hiit-saved-timers', JSON.stringify(updatedTimers));
+      fetchTimers();
     } catch (error) {
       console.error('Failed to set default timer:', error);
     }
