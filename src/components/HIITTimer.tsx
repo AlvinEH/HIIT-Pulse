@@ -423,7 +423,21 @@ export default function HIITTimer() {
     if (state.phase === 'finished') {
       resetTimer();
     } else {
-      setState((prev) => ({ ...prev, isActive: !prev.isActive }));
+      setState((prev) => {
+        const nextState = { ...prev, isActive: !prev.isActive };
+
+        // Keep music in sync with the timer play/pause state.
+        // Some browsers require a user interaction to start playback, so we do it in response to the button click.
+        if (audioRef.current) {
+          if (nextState.isActive && playlist.length > 0) {
+            audioRef.current.play().catch(() => {});
+          } else {
+            audioRef.current.pause();
+          }
+        }
+
+        return nextState;
+      });
     }
   };
 
@@ -459,6 +473,24 @@ export default function HIITTimer() {
     if (playlist.length === 0) return;
     setCurrentTrackIndex((prev) => (prev - 1 + playlist.length) % playlist.length);
   };
+
+  // Keep the audio element playback in sync when the timer is running.
+  useEffect(() => {
+    if (!audioRef.current) return;
+
+    if (state.isActive && playlist.length > 0) {
+      audioRef.current.play().catch(() => {});
+    } else {
+      audioRef.current.pause();
+    }
+  }, [state.isActive, playlist.length]);
+
+  // Auto-play the next/previous track when switching while the timer is active.
+  useEffect(() => {
+    if (!audioRef.current) return;
+    if (!state.isActive) return;
+    audioRef.current.play().catch(() => {});
+  }, [currentTrackIndex, state.isActive]);
 
   const handleHeaderImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -651,6 +683,7 @@ export default function HIITTimer() {
         <audio 
           ref={audioRef}
           src={playlist[currentTrackIndex].url}
+          volume={musicVolume}
           onEnded={nextTrack}
           onPlay={() => setIsMusicPlaying(true)}
           onPause={() => setIsMusicPlaying(false)}
