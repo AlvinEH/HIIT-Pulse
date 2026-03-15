@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Pause, RotateCcw, Settings as SettingsIcon, ChevronUp, ChevronDown, Music, SkipForward, SkipBack, Save, Trash2, List, Pencil, Volume2, VolumeX, Menu, X, Check, Star, Image as ImageIcon, Sun, Moon, Crop } from 'lucide-react';
+import { Play, Pause, RotateCcw, Settings as SettingsIcon, ChevronUp, ChevronDown, Music, SkipForward, SkipBack, Save, Trash2, List, Pencil, Volume2, VolumeX, Menu, X, Check, Star, Image as ImageIcon, Sun, Moon, Crop, Timer } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg } from '../utils/imageUtils';
@@ -798,8 +798,8 @@ export default function HIITTimer() {
 
               <nav className={cn("relative z-20 flex-1 px-6", headerImage ? "mt-44" : "mt-16")}>
                 <SidebarButton 
-                  icon={<List size={20} className="text-[var(--phase-finished)]" />} 
-                  label="Saved Workouts" 
+                  icon={<Timer size={20} className="text-[var(--phase-finished)]" />} 
+                  label="Saved Timers"
                   onClick={() => { setShowSaved(true); setShowSidebar(false); }} 
                 />
                 <SidebarButton 
@@ -1250,7 +1250,10 @@ export default function HIITTimer() {
                     className="flex-1 bg-[var(--surface-hover)] border border-[var(--border)] rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[var(--accent)] text-[var(--text)]"
                   />
                   <button 
-                    onClick={saveTimer}
+                    onClick={() => {
+                      saveTimer();
+                      closeSettings();
+                    }}
                     disabled={!timerName.trim()}
                     className="p-2 rounded-xl bg-[var(--accent)] text-[var(--bg)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--accent-hover)] transition-colors"
                   >
@@ -1522,7 +1525,7 @@ export default function HIITTimer() {
                                   className={cn(
                                     "p-2 transition-all rounded-lg",
                                     Number(timer.isDefault) === 1 
-                                      ? "text-[var(--accent)] bg-[var(--accent)]/10" 
+                                      ? "text-[var(--accent)]" 
                                       : "text-[var(--icon-secondary)]/40 hover:text-[var(--accent)] group-hover:opacity-100"
                                   )}
                                   title={Number(timer.isDefault) === 1 ? "Remove as default" : "Set as default"}
