@@ -1092,7 +1092,7 @@ export default function HIITTimer() {
                       setShowImageEditModal(false);
                     }
                   }} 
-                  className="p-2 text-[var(--accent)]"
+                  className="p-2 text-[var(--accent)] hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
                 >
                   <X size={24} />
                 </button>
@@ -1223,7 +1223,7 @@ export default function HIITTimer() {
                 <h2 className="text-xl font-medium text-[var(--text)]">Timer Settings</h2>
                 <button 
                   onClick={closeSettings} 
-                  className="text-[var(--accent)] p-1"
+                  className="text-[var(--accent)] p-1 hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
                   aria-label="Close settings"
                 >
                   <X size={20} />
@@ -1300,7 +1300,7 @@ export default function HIITTimer() {
                 <h2 className="text-xl font-medium text-[var(--text)]">Audio Settings</h2>
                 <button 
                   onClick={() => setShowAudioSettings(false)} 
-                  className="text-[var(--accent)] p-1"
+                  className="text-[var(--accent)] p-1 hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
                   aria-label="Close audio settings"
                 >
                   <X size={20} />
@@ -1403,7 +1403,7 @@ export default function HIITTimer() {
                 <h2 className="text-xl font-medium text-[var(--text)]">Select This Folder</h2>
                 <button 
                   onClick={() => setShowMusicConfirm(false)} 
-                  className="text-[var(--accent)] p-1"
+                  className="text-[var(--accent)] p-1 hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
                 >
                   <X size={20} />
                 </button>
@@ -1470,7 +1470,7 @@ export default function HIITTimer() {
                       setShowSettings(true); 
                       setShowSaved(false); 
                     }} 
-                    className="text-[var(--accent)] p-1"
+                    className="text-[var(--accent)] p-1 hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
                     aria-label="Create new timer"
                     title="Create new timer"
                   >
@@ -1478,7 +1478,7 @@ export default function HIITTimer() {
                   </button>
                   <button 
                     onClick={() => setShowSaved(false)} 
-                    className="text-[var(--accent)] p-1"
+                    className="text-[var(--accent)] p-1 hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
                     aria-label="Close saved timers"
                   >
                     <X size={20} />
