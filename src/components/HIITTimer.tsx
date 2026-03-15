@@ -1,10 +1,18 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Pause, RotateCcw, Settings as SettingsIcon, ChevronUp, ChevronDown, Music, SkipForward, SkipBack, Save, Trash2, List, Pencil, Volume2, VolumeX, Menu, X, Check, Star, Image as ImageIcon } from 'lucide-react';
+import { Play, Pause, RotateCcw, Settings as SettingsIcon, ChevronUp, ChevronDown, Music, SkipForward, SkipBack, Save, Trash2, List, Pencil, Volume2, VolumeX, Menu, X, Check, Star, Image as ImageIcon, Sun, Moon, Crop } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { TimerSettings, TimerState, TimerPhase, SavedTimer } from '../types';
+import Cropper from 'react-easy-crop';
+import { getCroppedImg } from '../utils/imageUtils';
+import { TimerSettings, TimerState, TimerPhase, SavedTimer, SoundType } from '../types';
 import { useAudio } from '../hooks/useAudio';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { 
+  sourceColorFromImage, 
+  SchemeContent, 
+  hexFromArgb,
+  Hct
+} from '@material/material-color-utilities';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -34,55 +42,149 @@ export default function HIITTimer() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAudioSettings, setShowAudioSettings] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
+  const [showImageEditModal, setShowImageEditModal] = useState(false);
+  const [isCropping, setIsCropping] = useState(false);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [timerName, setTimerName] = useState('');
   const [savedTimers, setSavedTimers] = useState<SavedTimer[]>([]);
   const [editingTimerId, setEditingTimerId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
-  const [soundType, setSoundType] = useState<'beep' | 'bell' | 'whistle' | 'digital'>(() => {
+  const [soundType, setSoundType] = useState<SoundType>(() => {
     return (localStorage.getItem('hiit-sound-type') as any) || 'beep';
   });
   const [soundVolume, setSoundVolume] = useState(() => {
     const saved = localStorage.getItem('hiit-sound-volume');
     return saved !== null ? parseFloat(saved) : 0.8;
-    return saved !== null ? parseFloat(saved) : 1;
   });
   const [musicVolume, setMusicVolume] = useState(() => {
     const saved = localStorage.getItem('hiit-music-volume');
-    return saved !== null ? parseFloat(saved) : 0.5;
+    return saved !== null ? parseFloat(saved) : 0.3;
   });
   const [headerImage, setHeaderImage] = useState<string | null>(() => {
     return localStorage.getItem('hiit-header-image');
   });
+  const [cachedThemeColors, setCachedThemeColors] = useState<{light: any, dark: any} | null>(() => {
+    const saved = localStorage.getItem('hiit-theme-colors');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem('hiit-pulse-theme');
+    if (saved) return saved === 'dark';
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
+
+  // Prefetch and cache theme color values to ensure seamless transitions
+  // and availability for JS-driven animations if needed
+  const [themeCache, setThemeCache] = useState<Record<string, string>>({});
+
   const { playPhaseTransition, playBeep } = useAudio();
+
+  useEffect(() => {
+    localStorage.setItem('hiit-pulse-theme', isDarkMode ? 'dark' : 'light');
+    if (isDarkMode) {
+      document.documentElement.classList.remove('light-mode');
+    } else {
+      document.documentElement.classList.add('light-mode');
+    }
+
+    // Cache the current theme colors after the class has been applied
+    // This ensures that any JS-driven animations have immediate access to the correct colors
+    const root = document.documentElement;
+    const styles = getComputedStyle(root);
+    setThemeCache({
+      bg: styles.getPropertyValue('--bg').trim(),
+      text: styles.getPropertyValue('--text').trim(),
+      accent: styles.getPropertyValue('--accent').trim(),
+      prep: styles.getPropertyValue('--phase-prep').trim(),
+      work: styles.getPropertyValue('--phase-work').trim(),
+      rest: styles.getPropertyValue('--phase-rest').trim(),
+      finished: styles.getPropertyValue('--phase-finished').trim(),
+    });
+  }, [isDarkMode]);
+
+  // Material 3 Dynamic Theming
+  useEffect(() => {
+    if (!headerImage) {
+      // Reset to Catppuccin defaults if no image
+      document.documentElement.style.removeProperty('--bg');
+      document.documentElement.style.removeProperty('--text');
+      document.documentElement.style.removeProperty('--surface');
+      document.documentElement.style.removeProperty('--surface-hover');
+      document.documentElement.style.removeProperty('--border');
+      document.documentElement.style.removeProperty('--accent');
+      document.documentElement.style.removeProperty('--accent-hover');
+      return;
+    }
+
+    const applyTheme = (scheme: any) => {
+      const root = document.documentElement;
+      root.style.setProperty('--bg', hexFromArgb(scheme.surfaceContainerLowest));
+      root.style.setProperty('--text', hexFromArgb(scheme.onSurface));
+      root.style.setProperty('--surface', hexFromArgb(scheme.surfaceContainerLow));
+      root.style.setProperty('--surface-hover', hexFromArgb(scheme.surfaceContainerHigh));
+      root.style.setProperty('--border', hexFromArgb(scheme.outlineVariant));
+      root.style.setProperty('--accent', hexFromArgb(scheme.primary));
+      root.style.setProperty('--accent-hover', hexFromArgb(scheme.primaryContainer));
+    };
+
+    if (cachedThemeColors) {
+      applyTheme(isDarkMode ? cachedThemeColors.dark : cachedThemeColors.light);
+      return;
+    }
+
+    const updateThemeFromImage = async () => {
+      const img = new Image();
+      img.src = headerImage;
+      img.crossOrigin = 'Anonymous';
+      
+      img.onload = async () => {
+        try {
+          const sourceColor = await sourceColorFromImage(img);
+          const hct = Hct.fromInt(sourceColor);
+          
+          // Generate both schemes at once
+          const lightScheme = new SchemeContent(hct, false, 0.0);
+          const darkScheme = new SchemeContent(hct, true, 0.0);
+          
+          const colors = {
+            light: {
+              surfaceContainerLowest: lightScheme.surfaceContainerLowest,
+              onSurface: lightScheme.onSurface,
+              surfaceContainerLow: lightScheme.surfaceContainerLow,
+              surfaceContainerHigh: lightScheme.surfaceContainerHigh,
+              outlineVariant: lightScheme.outlineVariant,
+              primary: lightScheme.primary,
+              primaryContainer: lightScheme.primaryContainer,
+            },
+            dark: {
+              surfaceContainerLowest: darkScheme.surfaceContainerLowest,
+              onSurface: darkScheme.onSurface,
+              surfaceContainerLow: darkScheme.surfaceContainerLow,
+              surfaceContainerHigh: darkScheme.surfaceContainerHigh,
+              outlineVariant: darkScheme.outlineVariant,
+              primary: darkScheme.primary,
+              primaryContainer: darkScheme.primaryContainer,
+            }
+          };
+
+          setCachedThemeColors(colors);
+          localStorage.setItem('hiit-theme-colors', JSON.stringify(colors));
+          applyTheme(isDarkMode ? colors.dark : colors.light);
+        } catch (err) {
+          console.error('Failed to extract color from image:', err);
+        }
+      };
+    };
+
+    updateThemeFromImage();
+  }, [headerImage, isDarkMode, cachedThemeColors]);
 
   const displayRound = state.phase === 'prep' ? 0 : state.currentRound;
 
-  // Music State
-  const [playlist, setPlaylist] = useState<Track[]>([]);
-  const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
-  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
-  const [pendingMusicFiles, setPendingMusicFiles] = useState<Track[] | null>(null);
-  const [showMusicConfirm, setShowMusicConfirm] = useState(false);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const headerImageInputRef = useRef<HTMLInputElement>(null);
-
-  const isFirstLoad = useRef(true);
-
-  // Track whether we've played the halfway sound for the current work phase
-  const halfwayPlayedRef = useRef(false);
-
-  // localStorage helpers for timer persistence
-  const getStoredTimers = (): SavedTimer[] => {
-    try {
-      const stored = localStorage.getItem('hiit-saved-timers');
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  };
-  
   useEffect(() => {
     localStorage.setItem('hiit-sound-type', soundType);
   }, [soundType]);
@@ -98,37 +200,44 @@ export default function HIITTimer() {
     }
   }, [musicVolume]);
 
-  // Apply volume to audio element when it's created or tracks change
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = musicVolume;
-    }
-  }, [playlist]);
+  // Music State
+  const [playlist, setPlaylist] = useState<Track[]>([]);
+  const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
+  const [isMusicPlaying, setIsMusicPlaying] = useState(false);
+  const [pendingMusicFiles, setPendingMusicFiles] = useState<Track[]>([]);
+  const [showMusicConfirm, setShowMusicConfirm] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const headerImageInputRef = useRef<HTMLInputElement>(null);
 
-  const saveTimersToStorage = (timers: SavedTimer[]) => {
+  const isFirstLoad = useRef(true);
+
+  // Track whether we've played the halfway sound for the current work phase
+  const halfwayPlayedRef = useRef(false);
+
+  const fetchTimers = async () => {
     try {
-      localStorage.setItem('hiit-saved-timers', JSON.stringify(timers));
-    } catch (error) {
-      console.error('Failed to save timers to storage:', error);
-    }
-  };
-
-  const fetchTimers = () => {
-    const data = getStoredTimers();
-    setSavedTimers(data);
-
-    if (isFirstLoad.current) {
-      const defaultTimer = data.find(t => t.isDefault === 1);
-      if (defaultTimer) {
-        setSettings({
-          prepTime: defaultTimer.prepTime,
-          workTime: defaultTimer.workTime,
-          restTime: defaultTimer.restTime,
-          rounds: defaultTimer.rounds,
-        });
-        setState(s => ({ ...s, timeLeft: defaultTimer.prepTime * 1000 }));
+      const res = await fetch('/api/timers');
+      if (res.ok) {
+        const data: SavedTimer[] = await res.json();
+        setSavedTimers(data);
+        
+        if (isFirstLoad.current) {
+          const defaultTimer = data.find(t => t.isDefault === 1);
+          if (defaultTimer) {
+            setSettings({
+              prepTime: defaultTimer.prepTime,
+              workTime: defaultTimer.workTime,
+              restTime: defaultTimer.restTime,
+              rounds: defaultTimer.rounds,
+            });
+            setState(s => ({ ...s, timeLeft: defaultTimer.prepTime }));
+          }
+          isFirstLoad.current = false;
+        }
       }
-      isFirstLoad.current = false;
+    } catch (error) {
+      console.error('Failed to fetch timers:', error);
     }
   };
 
@@ -136,52 +245,67 @@ export default function HIITTimer() {
     fetchTimers();
   }, []);
 
-  const saveTimer = () => {
+  const saveTimer = async () => {
     if (!timerName.trim()) return;
-    const timers = getStoredTimers();
-    const newTimer: SavedTimer = {
-      id: Date.now(),
-      name: timerName,
-      prepTime: settings.prepTime,
-      workTime: settings.workTime,
-      restTime: settings.restTime,
-      rounds: settings.rounds,
-      isDefault: 0,
-      createdAt: new Date().toISOString(),
-    };
-    timers.push(newTimer);
-    saveTimersToStorage(timers);
-    setTimerName('');
-    fetchTimers();
+    try {
+      const res = await fetch('/api/timers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...settings, name: timerName }),
+      });
+      if (res.ok) {
+        setTimerName('');
+        fetchTimers();
+      }
+    } catch (error) {
+      console.error('Failed to save timer:', error);
+    }
   };
 
-  const deleteTimer = (id: number) => {
-    const timers = getStoredTimers();
-    const filtered = timers.filter(t => t.id !== id);
-    saveTimersToStorage(filtered);
-    fetchTimers();
+  const deleteTimer = async (id: number) => {
+    try {
+      const res = await fetch(`/api/timers/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchTimers();
+      }
+    } catch (error) {
+      console.error('Failed to delete timer:', error);
+    }
   };
 
-  const renameTimer = (id: number) => {
+  const renameTimer = async (id: number) => {
     if (!editingName.trim()) {
       setEditingTimerId(null);
       return;
     }
-    const timers = getStoredTimers();
-    const updated = timers.map(t => t.id === id ? { ...t, name: editingName } : t);
-    saveTimersToStorage(updated);
-    setEditingTimerId(null);
-    fetchTimers();
+    try {
+      const res = await fetch(`/api/timers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editingName }),
+      });
+      if (res.ok) {
+        setEditingTimerId(null);
+        fetchTimers();
+      }
+    } catch (error) {
+      console.error('Failed to rename timer:', error);
+    }
   };
 
-  const setDefaultTimer = (id: number, isDefault: boolean) => {
-    const timers = getStoredTimers();
-    const updated = timers.map(t => ({
-      ...t,
-      isDefault: t.id === id && isDefault ? 1 : 0,
-    }));
-    saveTimersToStorage(updated);
-    fetchTimers();
+  const setDefaultTimer = async (id: number, isDefault: boolean) => {
+    try {
+      const res = await fetch(`/api/timers/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isDefault: isDefault ? 1 : 0 }),
+      });
+      if (res.ok) {
+        fetchTimers();
+      }
+    } catch (error) {
+      console.error('Failed to set default timer:', error);
+    }
   };
 
   const loadTimer = (timer: SavedTimer) => {
@@ -213,17 +337,6 @@ export default function HIITTimer() {
     setShowSettings(false);
     resetTimer();
   };
-
-  // Play/pause music with timer
-  useEffect(() => {
-    if (!audioRef.current) return;
-
-    if (state.isActive && playlist.length > 0) {
-      audioRef.current.play().catch(err => console.log('Could not play audio:', err));
-    } else {
-      audioRef.current.pause();
-    }
-  }, [state.isActive, playlist.length]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -314,46 +427,27 @@ export default function HIITTimer() {
     }
   };
 
-  const isMobileDevice = () => {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  };
-
-  const confirmMusicSelection = () => {
-    if (pendingMusicFiles && pendingMusicFiles.length > 0) {
-      setPlaylist(pendingMusicFiles);
-      setCurrentTrackIndex(0);
-      setPendingMusicFiles(null);
-      setShowMusicConfirm(false);
-    }
-  };
-
   const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-
-    // Filter for audio files and include the full path for sorting
-    const audioFiles = files.filter(f => {
-      const type = (f as File).type;
-      return type.startsWith('audio/') ||
-             /\.(mp3|wav|ogg|m4a|flac|aac)$/i.test(f.name);
-    }) as File[];
-
-    if (audioFiles.length === 0) {
-      alert('No audio files found in the selected folder.');
-      return;
-    }
-
-    // Sort by full path to preserve directory structure
-    audioFiles.sort((a, b) => a.webkitRelativePath.localeCompare(b.webkitRelativePath));
-
+    const audioFiles = files.filter(f => (f as File).type.startsWith('audio/')) as File[];
+    
     const newTracks = audioFiles.map(file => ({
       file,
       url: URL.createObjectURL(file),
       name: file.name.replace(/\.[^/.]+$/, "")
     }));
 
-    // Show confirmation modal on both desktop and mobile
-    setPendingMusicFiles(newTracks);
-    setShowMusicConfirm(true);
+    if (newTracks.length > 0) {
+      setPendingMusicFiles(newTracks);
+      setShowMusicConfirm(true);
+    }
+  };
+
+  const confirmMusicFolder = () => {
+    setPlaylist(pendingMusicFiles);
+    setCurrentTrackIndex(0);
+    setPendingMusicFiles([]);
+    setShowMusicConfirm(false);
   };
 
   const nextTrack = () => {
@@ -374,6 +468,43 @@ export default function HIITTimer() {
         const base64String = reader.result as string;
         setHeaderImage(base64String);
         localStorage.setItem('hiit-header-image', base64String);
+        
+        // Extract and cache colors immediately
+        const img = new Image();
+        img.src = base64String;
+        img.onload = async () => {
+          try {
+            const sourceColor = await sourceColorFromImage(img);
+            const hct = Hct.fromInt(sourceColor);
+            const lightScheme = new SchemeContent(hct, false, 0.0);
+            const darkScheme = new SchemeContent(hct, true, 0.0);
+            
+            const colors = {
+              light: {
+                surfaceContainerLowest: lightScheme.surfaceContainerLowest,
+                onSurface: lightScheme.onSurface,
+                surfaceContainerLow: lightScheme.surfaceContainerLow,
+                surfaceContainerHigh: lightScheme.surfaceContainerHigh,
+                outlineVariant: lightScheme.outlineVariant,
+                primary: lightScheme.primary,
+                primaryContainer: lightScheme.primaryContainer,
+              },
+              dark: {
+                surfaceContainerLowest: darkScheme.surfaceContainerLowest,
+                onSurface: darkScheme.onSurface,
+                surfaceContainerLow: darkScheme.surfaceContainerLow,
+                surfaceContainerHigh: darkScheme.surfaceContainerHigh,
+                outlineVariant: darkScheme.outlineVariant,
+                primary: darkScheme.primary,
+                primaryContainer: darkScheme.primaryContainer,
+              }
+            };
+            setCachedThemeColors(colors);
+            localStorage.setItem('hiit-theme-colors', JSON.stringify(colors));
+          } catch (err) {
+            console.error('Failed to extract colors on upload:', err);
+          }
+        };
       };
       reader.readAsDataURL(file);
     }
@@ -381,7 +512,27 @@ export default function HIITTimer() {
 
   const removeHeaderImage = () => {
     setHeaderImage(null);
+    setCachedThemeColors(null);
     localStorage.removeItem('hiit-header-image');
+    localStorage.removeItem('hiit-theme-colors');
+  };
+
+  const onCropComplete = useCallback((_croppedArea: any, croppedAreaPixels: any) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  const handleCropSave = async () => {
+    if (!headerImage || !croppedAreaPixels) return;
+    try {
+      const croppedImage = await getCroppedImg(headerImage, croppedAreaPixels);
+      if (croppedImage) {
+        setHeaderImage(croppedImage);
+        localStorage.setItem('hiit-header-image', croppedImage);
+        setIsCropping(false);
+      }
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const nextRound = () => {
@@ -433,13 +584,25 @@ export default function HIITTimer() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const getPhaseColor = (phase: TimerPhase) => {
+  const getPhaseColor = (phase: TimerPhase, type: 'text' | 'bg' | 'border' = 'text') => {
     switch (phase) {
-      case 'prep': return 'text-red-400';
-      case 'work': return 'text-emerald-400';
-      case 'rest': return 'text-sky-400';
-      case 'finished': return 'text-purple-400';
-      default: return 'text-white';
+      case 'prep': 
+        if (type === 'bg') return 'bg-[var(--phase-prep)]';
+        if (type === 'border') return 'border-[var(--phase-prep)]';
+        return 'text-[var(--phase-prep)]';
+      case 'work': 
+        if (type === 'bg') return 'bg-[var(--phase-work)]';
+        if (type === 'border') return 'border-[var(--phase-work)]';
+        return 'text-[var(--phase-work)]';
+      case 'rest': 
+        if (type === 'bg') return 'bg-[var(--phase-rest)]';
+        if (type === 'border') return 'border-[var(--phase-rest)]';
+        return 'text-[var(--phase-rest)]';
+      case 'finished': 
+        if (type === 'bg') return 'bg-[var(--phase-finished)]';
+        if (type === 'border') return 'border-[var(--phase-finished)]';
+        return 'text-[var(--phase-finished)]';
+      default: return type === 'text' ? 'text-[var(--text)]' : '';
     }
   };
 
@@ -482,7 +645,7 @@ export default function HIITTimer() {
   const totalProgress = Math.max(0, Math.min(1, totalElapsed / Math.max(1, totalDuration)));
 
   return (
-    <div className="min-h-screen bg-[#0A0A0A] text-white font-sans selection:bg-emerald-500/30 flex flex-col items-center justify-center p-6 overflow-hidden relative">
+    <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] font-sans selection:bg-[var(--accent)]/30 flex flex-col items-center justify-center p-6 overflow-hidden relative">
       {/* Hidden Audio Element */}
       {playlist.length > 0 && (
         <audio 
@@ -495,14 +658,15 @@ export default function HIITTimer() {
       )}
 
       {/* Hidden File Inputs */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleFolderSelect}
-        webkitdirectory=""
-        mozdirectory=""
-        multiple
-        className="hidden"
+      <input 
+        type="file" 
+        ref={fileInputRef} 
+        onChange={handleFolderSelect} 
+        multiple 
+        webkitdirectory="" 
+        directory="" 
+        accept="audio/*" 
+        className="hidden" 
       />
 
       <input 
@@ -529,64 +693,83 @@ export default function HIITTimer() {
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 bottom-0 w-65 bg-zinc-900 border-r border-zinc-800 z-[70] p-8 flex flex-col shadow-2xl overflow-hidden"
+              className="fixed top-0 left-0 bottom-0 w-65 bg-[var(--surface)] border-r border-[var(--border)] z-[70] flex flex-col shadow-2xl overflow-hidden"
             >
+              {/* Top Bar (Branding & Close) */}
+              <div className="absolute top-4 left-5 right-4 z-30 flex justify-between items-center">
+                <div className="flex flex-col">
+                  <span className={cn(
+                    "text-[10px] font-bold uppercase tracking-[0.25em] font-mono transition-colors duration-300",
+                    headerImage ? "text-white/95 drop-shadow-sm" : "text-[var(--icon-secondary)]"
+                  )}>
+                    HIIT PULSE
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button 
+                    onClick={() => setShowImageEditModal(true)} 
+                    className={cn(
+                      "p-1.5 transition-colors duration-300",
+                      headerImage ? "text-white/70 hover:text-white" : "text-[var(--icon-secondary)] hover:text-[var(--text)]"
+                    )}
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button 
+                    onClick={() => setShowSidebar(false)} 
+                    className={cn(
+                      "p-1.5 transition-colors duration-300",
+                      headerImage ? "text-white/80 hover:text-white" : "text-[var(--icon-secondary)] hover:text-[var(--text)]"
+                    )}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+              </div>
+
               {/* Sidebar Header Background Image */}
               {headerImage && (
-                <div className="absolute top-0 left-0 right-0 h-32 z-0 pointer-events-none overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-40 z-0 pointer-events-none overflow-hidden">
                   <img 
                     src={headerImage} 
                     alt="Sidebar Header Background" 
-                    className="w-full h-full object-cover opacity-40 blur-[1px]"
+                    className="w-full h-full object-cover opacity-60 blur-[0.5px]"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-b from-transparent to-zinc-900" />
+                  <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-[var(--surface)]" />
                 </div>
               )}
 
-              <div className="flex justify-between items-center mb-2">
-                <div className="flex flex-col">
-                  <span className="text-[12px] uppercase tracking-[0.2em] text-zinc-500 font-mono">HIIT PULSE</span>
-                </div>
-                <button onClick={() => setShowSidebar(false)} className="p-2 text-zinc-500 hover:text-white transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-
-              <nav className="relative z-20">
+              <nav className={cn("relative z-20 flex-1 px-6", headerImage ? "mt-44" : "mt-16")}>
                 <SidebarButton 
-                  icon={<List size={20} />} 
+                  icon={<List size={20} className="text-[var(--phase-finished)]" />} 
                   label="Saved Workouts" 
                   onClick={() => { setShowSaved(true); setShowSidebar(false); }} 
                 />
                 <SidebarButton 
-                  icon={<SettingsIcon size={20} />} 
+                  icon={<SettingsIcon size={20} className="text-[var(--accent)]" />} 
                   label="Timer Settings" 
                   onClick={() => { setShowSettings(true); setShowSidebar(false); }} 
                 />
                 <SidebarButton 
-                  icon={<Volume2 size={20} />} 
+                  icon={<Volume2 size={20} className="text-[var(--phase-rest)]" />} 
                   label="Audio Settings" 
                   onClick={() => { setShowAudioSettings(true); setShowSidebar(false); }} 
                 />
                 <SidebarButton 
-                  icon={<Music size={20} className={playlist.length > 0 ? "text-emerald-400" : ""} />} 
-                  label="Music Library" 
+                  icon={<Music size={20} className={playlist.length > 0 ? "text-[var(--accent)]" : "text-[var(--phase-prep)]"} />} 
+                  label="Music Library (Folder)" 
                   onClick={() => { fileInputRef.current?.click(); setShowSidebar(false); }} 
                 />
-                <SidebarButton 
-                  icon={<ImageIcon size={20} className={headerImage ? "text-emerald-400" : ""} />} 
-                  label={headerImage ? "Change Header Image" : "Upload Header Image"} 
-                  onClick={() => { headerImageInputRef.current?.click(); setShowSidebar(false); }} 
-                />
-                {headerImage && (
-                  <SidebarButton 
-                    icon={<Trash2 size={20} className="text-red-400" />} 
-                    label="Remove Header Image" 
-                    onClick={() => { removeHeaderImage(); setShowSidebar(false); }} 
-                  />
-                )}
               </nav>
+
+              <div className="relative z-20 p-6 border-t border-[var(--border)]">
+                <SidebarButton 
+                  icon={isDarkMode ? <Sun size={20} className="text-[var(--phase-prep)]" /> : <Moon size={20} className="text-[var(--accent)]" />} 
+                  label={isDarkMode ? "Light Mode" : "Dark Mode"} 
+                  onClick={() => setIsDarkMode(!isDarkMode)} 
+                />
+              </div>
 
             </motion.div>
           </>
@@ -604,7 +787,7 @@ export default function HIITTimer() {
         <div className="flex gap-4 items-center">
           <button 
             onClick={() => setShowSidebar(true)}
-            className="p-2 text-zinc-500 hover:text-white transition-colors"
+            className="p-2 text-[var(--accent)] hover:text-[var(--text)] transition-colors"
             title="Open Menu"
           >
             <Menu size={20} />
@@ -647,7 +830,7 @@ export default function HIITTimer() {
               </span>
             )}
             {state.phase !== 'finished' && (
-              <span className="text-zinc-500 text-sm mt-4 tracking-widest uppercase">
+              <span className="text-[var(--icon-secondary)] text-sm mt-4 tracking-widest uppercase">
                 Round {displayRound} / {settings.rounds}
               </span>
             )}
@@ -664,7 +847,7 @@ export default function HIITTimer() {
             fill="none"
             stroke="currentColor"
             strokeWidth="6"
-            className="text-zinc-900"
+            className="text-[var(--surface)]"
           />
           
           {/* outer phase progress */}
@@ -698,7 +881,7 @@ export default function HIITTimer() {
             fill="none"
             stroke="currentColor"
             strokeWidth="6"
-            className="text-zinc-900/50"
+            className="text-[var(--surface)]/50"
           />
           
           {/* inner total-progress ring (just inside the existing progress bar) */}
@@ -713,7 +896,7 @@ export default function HIITTimer() {
             pathLength="100"
             animate={{ strokeDashoffset: 100 - totalProgress * 100 }}
             transition={{ duration: state.isActive ? 0.05 : 0, ease: "linear" }}
-            className="text-purple-400/80"
+            className="text-[var(--phase-finished)]/80"
           />
         </svg>
       </div>
@@ -726,14 +909,14 @@ export default function HIITTimer() {
             animate={{ opacity: 1, y: 0 }}
             className="mt-4 flex flex-col items-center gap-2"
           >
-            <div className="flex items-center gap-4 text-zinc-400">
-              <button onClick={prevTrack} className="hover:text-white transition-colors"><SkipBack size={20} /></button>
+            <div className="flex items-center gap-4 text-[var(--accent)]/60">
+              <button onClick={prevTrack} className="hover:text-[var(--accent)] transition-colors"><SkipBack size={20} /></button>
               <div className="flex flex-col items-center w-48 overflow-hidden">
-                <span className="text-xs font-medium text-emerald-400 uppercase tracking-widest truncate w-full text-center">
+                <span className="text-xs font-medium text-[var(--accent)] uppercase tracking-widest truncate w-full text-center">
                   {playlist[currentTrackIndex].name}
                 </span>
               </div>
-              <button onClick={nextTrack} className="hover:text-white transition-colors"><SkipForward size={20} /></button>
+              <button onClick={nextTrack} className="hover:text-[var(--accent)] transition-colors"><SkipForward size={20} /></button>
             </div>
           </motion.div>
         )}
@@ -745,7 +928,7 @@ export default function HIITTimer() {
           <button 
             onClick={prevRound}
             disabled={state.phase === 'prep' || state.phase === 'finished'}
-            className="p-2 transition-colors text-zinc-500 hover:text-white disabled:opacity-10 disabled:cursor-not-allowed"
+            className="p-2 transition-colors text-[var(--accent)]/40 hover:text-[var(--accent)] disabled:opacity-10 disabled:cursor-not-allowed"
             title="Previous Round"
           >
             <SkipBack size={28} />
@@ -756,7 +939,12 @@ export default function HIITTimer() {
               onClick={resetTimer}
               title="Reset"
               className={cn(
-                "w-24 h-24 flex items-center justify-center transition-all transform active:scale-95 rounded-full border-2 border-purple-500/20 bg-purple-500/6 text-purple-400",
+                "w-24 h-24 flex items-center justify-center transition-all transform active:scale-95 rounded-full border-2",
+                getPhaseColor('finished', 'border'),
+                "border-opacity-20",
+                getPhaseColor('finished', 'bg'),
+                "bg-opacity-5",
+                getPhaseColor('finished', 'text')
               )}
             >
               <RotateCcw size={36} />
@@ -765,8 +953,12 @@ export default function HIITTimer() {
             <button 
               onClick={toggleTimer}
               className={cn(
-                "w-24 h-24 flex items-center justify-center transition-all transform active:scale-95 rounded-full border-2 border-emerald-500/20 hover:border-emerald-500/40 bg-emerald-500/5 hover:bg-emerald-500/10 text-emerald-500",
-                getPhaseColor(state.phase)
+                "w-24 h-24 flex items-center justify-center transition-all transform active:scale-95 rounded-full border-2",
+                getPhaseColor(state.phase, 'border'),
+                "border-opacity-20 hover:border-opacity-40",
+                getPhaseColor(state.phase, 'bg'),
+                "bg-opacity-5 hover:bg-opacity-10",
+                getPhaseColor(state.phase, 'text')
               )}
              title="Pause Timer"
             >
@@ -777,7 +969,7 @@ export default function HIITTimer() {
            <button 
              onClick={nextRound}
              disabled={!['prep', 'work', 'rest'].includes(state.phase)}
-             className="p-2 transition-colors text-zinc-500 hover:text-white disabled:opacity-10 disabled:cursor-not-allowed"
+             className="p-2 transition-colors text-[var(--accent)]/40 hover:text-[var(--accent)] disabled:opacity-10 disabled:cursor-not-allowed"
              title="Next Round"
            >
              <SkipForward size={28} />
@@ -789,12 +981,154 @@ export default function HIITTimer() {
       {state.phase !== 'finished' && (
         <button 
           onClick={resetTimer}
-          className="fixed bottom-[25px] left-1/2 -translate-x-1/2 p-2 transition-colors text-zinc-600 hover:text-white z-50"
+          className="fixed bottom-[25px] left-1/2 -translate-x-1/2 p-2 transition-colors text-[var(--icon-secondary)] hover:text-[var(--text)] z-50"
           title="Reset Timer"
         >
           <RotateCcw size={20} />
         </button>
       )}
+
+      {/* Header Image Edit Modal */}
+      <AnimatePresence>
+        {showImageEditModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowImageEditModal(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md bg-[var(--surface)] border border-[var(--border)] rounded-3xl p-8 z-[110] shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-8">
+                <h2 className="text-2xl font-bold tracking-tight">
+                  {isCropping ? "Adjust Image" : "Edit Header Image"}
+                </h2>
+                <button 
+                  onClick={() => {
+                    if (isCropping) {
+                      setIsCropping(false);
+                    } else {
+                      setShowImageEditModal(false);
+                    }
+                  }} 
+                  className="p-2 text-[var(--icon-secondary)] hover:text-[var(--text)] transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="space-y-8">
+                <div className="relative aspect-video rounded-2xl overflow-hidden border border-[var(--border)] bg-black/5">
+                  {isCropping && headerImage ? (
+                    <div className="absolute inset-0">
+                      <Cropper
+                        image={headerImage}
+                        crop={crop}
+                        zoom={zoom}
+                        aspect={16 / 9}
+                        onCropChange={setCrop}
+                        onCropComplete={onCropComplete}
+                        onZoomChange={setZoom}
+                      />
+                    </div>
+                  ) : headerImage ? (
+                    <img 
+                      src={headerImage} 
+                      alt="Current Header" 
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-[var(--icon-secondary)] gap-2">
+                      <ImageIcon size={48} strokeWidth={1} />
+                      <span className="text-sm font-medium">No image uploaded</span>
+                    </div>
+                  )}
+                </div>
+
+                {isCropping ? (
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-xs font-bold uppercase tracking-wider text-[var(--icon-secondary)]">
+                        <span>Zoom</span>
+                        <span>{Math.round(zoom * 100)}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        value={zoom}
+                        min={1}
+                        max={3}
+                        step={0.1}
+                        aria-labelledby="Zoom"
+                        onChange={(e) => setZoom(Number(e.target.value))}
+                        className="w-full h-1.5 bg-[var(--border)] rounded-full appearance-none cursor-pointer accent-[var(--accent)]"
+                      />
+                    </div>
+                    <div className="flex justify-center gap-4">
+                      <button
+                        onClick={() => setIsCropping(false)}
+                        title="Cancel"
+                        className="w-14 h-14 flex items-center justify-center bg-[var(--surface-hover)] hover:bg-[var(--border)] text-[var(--text)] rounded-2xl transition-all"
+                      >
+                        <X size={24} />
+                      </button>
+                      <button
+                        onClick={handleCropSave}
+                        title="Apply Crop"
+                        className="w-14 h-14 flex items-center justify-center bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-2xl transition-all shadow-lg shadow-[var(--accent)]/20"
+                      >
+                        <Check size={24} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex justify-center gap-4">
+                    <button
+                      onClick={() => {
+                        headerImageInputRef.current?.click();
+                        setShowImageEditModal(false);
+                      }}
+                      title={headerImage ? "Change Image" : "Upload Image"}
+                      className="w-14 h-14 flex items-center justify-center bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-2xl transition-all shadow-lg shadow-[var(--accent)]/20"
+                    >
+                      <ImageIcon size={24} />
+                    </button>
+
+                    {headerImage && (
+                      <>
+                        <button
+                          onClick={() => setIsCropping(true)}
+                          title="Adjust Image"
+                          className="w-14 h-14 flex items-center justify-center bg-[var(--surface-hover)] hover:bg-[var(--border)] text-[var(--text)] rounded-2xl transition-all"
+                        >
+                          <Crop size={24} />
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            removeHeaderImage();
+                            setShowImageEditModal(false);
+                          }}
+                          title="Remove Image"
+                          className="w-14 h-14 flex items-center justify-center bg-[var(--phase-work)]/10 hover:bg-[var(--phase-work)]/20 text-[var(--phase-work)] rounded-2xl transition-all"
+                        >
+                          <Trash2 size={24} />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {/* Timer Settings Modal */}
       <AnimatePresence>
@@ -808,13 +1142,13 @@ export default function HIITTimer() {
           >
             <div 
               onClick={(e) => e.stopPropagation()}
-              className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-3xl p-[22px] shadow-2xl"
+              className="bg-[var(--surface)] border border-[var(--border)] w-full max-w-sm rounded-3xl p-[22px] shadow-2xl"
             >
               <div className="flex justify-between items-center mb-8">
-                <h2 className="text-xl font-medium">Timer Settings</h2>
+                <h2 className="text-xl font-medium text-[var(--text)]">Timer Settings</h2>
                 <button 
                   onClick={closeSettings} 
-                  className="text-zinc-500 hover:text-white transition-colors p-1"
+                  className="text-[var(--accent)] hover:text-[var(--text)] transition-colors p-1"
                   aria-label="Close settings"
                 >
                   <X size={20} />
@@ -847,20 +1181,19 @@ export default function HIITTimer() {
                 />
               </div>
 
-              <div className="mt-8 pt-8 border-t border-zinc-800">
+              <div className="mt-8 pt-8 border-t border-[var(--border)]">
                 <div className="flex gap-2 w-full">
                   <input 
                     type="text" 
                     placeholder="Timer Name" 
                     value={timerName}
                     onChange={(e) => setTimerName(e.target.value)}
-                    autoCapitalize="words"
-                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-emerald-500"
+                    className="flex-1 bg-[var(--surface-hover)] border border-[var(--border)] rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[var(--accent)] text-[var(--text)]"
                   />
                   <button 
                     onClick={saveTimer}
                     disabled={!timerName.trim()}
-                    className="p-2 rounded-xl bg-emerald-500 text-white disabled:opacity-50 disabled:cursor-not-allowed hover:bg-emerald-600 transition-colors"
+                    className="p-2 rounded-xl bg-[var(--accent)] text-[var(--bg)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--accent-hover)] transition-colors"
                   >
                     <Save size={20} />
                   </button>
@@ -883,13 +1216,13 @@ export default function HIITTimer() {
           >
             <div 
               onClick={(e) => e.stopPropagation()}
-              className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-3xl p-[22px] shadow-2xl"
+              className="bg-[var(--surface)] border border-[var(--border)] w-full max-w-sm rounded-3xl p-[22px] shadow-2xl"
             >
               <div className="flex justify-between items-center mb-8">
-                <h2 className="text-xl font-medium">Audio Settings</h2>
+                <h2 className="text-xl font-medium text-[var(--text)]">Audio Settings</h2>
                 <button 
                   onClick={() => setShowAudioSettings(false)} 
-                  className="text-zinc-500 hover:text-white transition-colors p-1"
+                  className="text-[var(--phase-rest)] hover:text-[var(--text)] transition-colors p-1"
                   aria-label="Close audio settings"
                 >
                   <X size={20} />
@@ -898,15 +1231,15 @@ export default function HIITTimer() {
 
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <span className="text-zinc-400 font-medium">Sound Type</span>
-                  <select
+                  <span className="text-[var(--icon-secondary)] font-medium">Sound Type</span>
+                  <select 
                     value={soundType}
                     onChange={(e) => {
                       const newType = e.target.value as any;
                       setSoundType(newType);
                       playPhaseTransition(false, soundVolume, newType);
                     }}
-                    className="bg-zinc-800 text-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none border border-zinc-700"
+                    className="bg-[var(--surface-hover)] text-[var(--text)] rounded-lg px-3 py-2 text-sm focus:outline-none border border-[var(--border)]"
                   >
                     <option value="beep">Beep</option>
                     <option value="bell">Bell</option>
@@ -923,11 +1256,11 @@ export default function HIITTimer() {
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-zinc-400 font-medium">Timer Volume</span>
-                    <span className="text-zinc-500 text-sm">{Math.round(soundVolume * 100)}%</span>
+                    <span className="text-[var(--icon-secondary)] font-medium">Timer Volume</span>
+                    <span className="text-[var(--icon-secondary)] text-sm">{Math.round(soundVolume * 100)}%</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <VolumeX size={16} className="text-zinc-600" />
+                    <VolumeX size={16} className="text-[var(--phase-work)]/60" />
                     <input 
                       type="range"
                       min="0"
@@ -940,19 +1273,19 @@ export default function HIITTimer() {
                       }}
                       onMouseUp={() => playPhaseTransition(false, soundVolume, soundType)}
                       onTouchEnd={() => playPhaseTransition(false, soundVolume, soundType)}
-                      className="flex-1 h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                      className="flex-1 h-1.5 bg-[var(--surface-hover)] rounded-lg appearance-none cursor-pointer accent-[var(--accent)]"
                     />
-                    <Volume2 size={16} className="text-zinc-600" />
+                    <Volume2 size={16} className="text-[var(--phase-rest)]/60" />
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-zinc-400 font-medium">Music Volume</span>
-                    <span className="text-zinc-500 text-sm">{Math.round(musicVolume * 100)}%</span>
+                    <span className="text-[var(--icon-secondary)] font-medium">Music Volume</span>
+                    <span className="text-[var(--icon-secondary)] text-sm">{Math.round(musicVolume * 100)}%</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <VolumeX size={16} className="text-zinc-600" />
+                    <VolumeX size={16} className="text-[var(--phase-work)]/60" />
                     <input 
                       type="range"
                       min="0"
@@ -963,10 +1296,72 @@ export default function HIITTimer() {
                         const newVolume = parseFloat(e.target.value);
                         setMusicVolume(newVolume);
                       }}
-                      className="flex-1 h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                      className="flex-1 h-1.5 bg-[var(--surface-hover)] rounded-lg appearance-none cursor-pointer accent-[var(--accent)]"
                     />
-                    <Volume2 size={16} className="text-zinc-600" />
+                    <Volume2 size={16} className="text-[var(--phase-rest)]/60" />
                   </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Music Folder Confirmation Modal */}
+      <AnimatePresence>
+        {showMusicConfirm && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            onClick={() => setShowMusicConfirm(false)}
+            className="fixed inset-0 z-[60] flex items-center justify-center p-[10px] bg-black/80 backdrop-blur-sm"
+          >
+            <div 
+              onClick={(e) => e.stopPropagation()}
+              className="bg-[var(--surface)] border border-[var(--border)] w-full max-w-sm rounded-3xl p-[22px] shadow-2xl"
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-medium text-[var(--text)]">Select This Folder</h2>
+                <button 
+                  onClick={() => setShowMusicConfirm(false)} 
+                  className="text-[var(--icon-secondary)] hover:text-[var(--text)] transition-colors p-1"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-[var(--icon-secondary)] text-sm">
+                  Found {pendingMusicFiles.length} song{pendingMusicFiles.length !== 1 ? 's' : ''} in this folder:
+                </p>
+                
+                <div className="max-h-40 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
+                  {pendingMusicFiles.slice(0, 5).map((track, i) => (
+                    <div key={i} className="text-xs text-[var(--icon-secondary)]/70 truncate bg-[var(--surface-hover)]/50 px-3 py-2 rounded-lg">
+                      {track.name}
+                    </div>
+                  ))}
+                  {pendingMusicFiles.length > 5 && (
+                    <div className="text-xs text-[var(--icon-secondary)]/50 italic px-3">
+                      + {pendingMusicFiles.length - 5} more...
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => setShowMusicConfirm(false)}
+                    className="flex-1 px-4 py-3 rounded-2xl bg-[var(--surface-hover)] text-[var(--text)] font-medium hover:bg-[var(--border)] transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={confirmMusicFolder}
+                    className="flex-1 px-4 py-3 rounded-2xl bg-[var(--accent)] text-white font-medium hover:opacity-90 transition-colors"
+                  >
+                    Load Folder
+                  </button>
                 </div>
               </div>
             </div>
@@ -986,13 +1381,13 @@ export default function HIITTimer() {
           >
             <div 
               onClick={(e) => e.stopPropagation()}
-              className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-3xl p-[22px] shadow-2xl max-h-[80vh] flex flex-col"
+              className="bg-[var(--surface)] border border-[var(--border)] w-full max-w-sm rounded-3xl p-[22px] shadow-2xl max-h-[80vh] flex flex-col"
             >
               <div className="flex justify-between items-center mb-8">
-                <h2 className="text-xl font-medium">Saved Timers</h2>
+                <h2 className="text-xl font-medium text-[var(--text)]">Saved Timers</h2>
                 <button 
                   onClick={() => setShowSaved(false)} 
-                  className="text-zinc-500 hover:text-white transition-colors p-1"
+                  className="text-[var(--phase-finished)] hover:text-[var(--text)] transition-colors p-1"
                   aria-label="Close saved timers"
                 >
                   <X size={20} />
@@ -1001,14 +1396,14 @@ export default function HIITTimer() {
 
               <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
                 {savedTimers.length === 0 ? (
-                  <div className="text-center py-12 text-zinc-500">
+                  <div className="text-center py-12 text-[var(--icon-secondary)]">
                     <p>No saved timers yet.</p>
                   </div>
                 ) : (
                   savedTimers.map((timer) => (
                     <div 
                       key={timer.id}
-                      className="group relative rounded-2xl bg-zinc-800/50 border border-zinc-800 hover:border-zinc-700 transition-all overflow-hidden"
+                      className="group relative rounded-2xl bg-[var(--surface-hover)]/50 border border-[var(--border)] hover:border-[var(--border-hover)] transition-all overflow-hidden"
                     >
                       {editingTimerId === timer.id ? (
                         <div className="w-full pl-2 pr-4 py-3 flex gap-2 items-center">
@@ -1026,12 +1421,12 @@ export default function HIITTimer() {
                               if (e.relatedTarget && (e.relatedTarget as HTMLElement).id === `save-name-${timer.id}`) return;
                               renameTimer(timer.id);
                             }}
-                            className="flex-1 bg-transparent border-none px-2 py-1 text-sm focus:outline-none min-w-0 font-medium text-zinc-200"
+                            className="flex-1 bg-transparent border-none px-2 py-1 text-sm focus:outline-none min-w-0 font-medium text-[var(--text)]"
                           />
                           <button
                             id={`save-name-${timer.id}`}
                             onClick={() => renameTimer(timer.id)}
-                            className="p-1.5 text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors flex-shrink-0"
+                            className="p-1.5 text-[var(--accent)] hover:bg-[var(--accent)]/10 rounded-lg transition-colors flex-shrink-0"
                             title="Save name"
                           >
                             <Check size={18} />
@@ -1046,15 +1441,15 @@ export default function HIITTimer() {
                           />
                           <div className="relative z-10 pointer-events-none">
                             <div className="flex items-center gap-2 mb-1.5">
-                              <h3 className="font-medium text-zinc-200">{timer.name}</h3>
+                              <h3 className="font-medium text-[var(--text)]">{timer.name}</h3>
                               {Number(timer.isDefault) === 1 && (
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400/80 bg-amber-400/10 px-1.5 py-0.5 rounded-md">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)] bg-[var(--accent)]/10 px-1.5 py-0.5 rounded-md">
                                   Default
                                 </span>
                               )}
                             </div>
                             <div className="flex justify-between items-center">
-                              <div className="text-xs text-zinc-500 space-y-0.5 font-medium">
+                              <div className="text-xs text-[var(--icon-secondary)]/60 space-y-0.5 font-medium">
                                 <div>{timer.rounds} Rounds</div>
                                 <div>{timer.workTime}s Work</div>
                                 <div>{timer.restTime}s Rest</div>
@@ -1068,8 +1463,8 @@ export default function HIITTimer() {
                                   className={cn(
                                     "p-2 transition-all rounded-lg",
                                     Number(timer.isDefault) === 1 
-                                      ? "text-amber-400" 
-                                      : "text-zinc-500 hover:text-amber-400 opacity-40 group-hover:opacity-100"
+                                      ? "text-[var(--accent)] bg-[var(--accent)]/10" 
+                                      : "text-[var(--icon-secondary)]/40 hover:text-[var(--accent)] group-hover:opacity-100"
                                   )}
                                   title={Number(timer.isDefault) === 1 ? "Remove as default" : "Set as default"}
                                 >
@@ -1081,7 +1476,7 @@ export default function HIITTimer() {
                                     setEditingTimerId(timer.id);
                                     setEditingName(timer.name);
                                   }}
-                                  className="p-2 text-zinc-500 hover:text-emerald-400 opacity-40 group-hover:opacity-100 transition-all rounded-lg"
+                                  className="p-2 text-[var(--icon-secondary)]/40 hover:text-[var(--text)] hover:bg-[var(--surface-hover)] group-hover:opacity-100 transition-all rounded-lg"
                                   title="Rename timer"
                                 >
                                   <Pencil size={16} />
@@ -1091,7 +1486,7 @@ export default function HIITTimer() {
                                     e.stopPropagation();
                                     deleteTimer(timer.id);
                                   }}
-                                  className="p-2 text-zinc-500 hover:text-red-400 opacity-40 group-hover:opacity-100 transition-all rounded-lg"
+                                  className="p-2 text-[var(--icon-secondary)]/40 hover:text-red-400 hover:bg-red-400/10 group-hover:opacity-100 transition-all rounded-lg"
                                   title="Delete timer"
                                 >
                                   <Trash2 size={16} />
@@ -1110,60 +1505,13 @@ export default function HIITTimer() {
         )}
       </AnimatePresence>
 
-      {/* Music Confirmation Modal (Mobile) */}
-      <AnimatePresence>
-        {showMusicConfirm && pendingMusicFiles && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            onClick={() => { setShowMusicConfirm(false); setPendingMusicFiles(null); }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-[10px] bg-black/80 backdrop-blur-sm"
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              className="bg-zinc-900 border border-zinc-800 w-full max-w-sm rounded-3xl p-[22px] shadow-2xl max-h-[80vh] flex flex-col"
-            >
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-medium">Select This Folder</h2>
-                <button
-                  onClick={() => { setShowMusicConfirm(false); setPendingMusicFiles(null); }}
-                  className="text-zinc-500 hover:text-white transition-colors p-1"
-                  aria-label="Close confirmation"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto space-y-3 mb-6 pr-2 custom-scrollbar">
-                <p className="text-zinc-400 text-sm mb-4">
-                  Found {pendingMusicFiles.length} song{pendingMusicFiles.length !== 1 ? 's' : ''} in this folder:
-                </p>
-                {pendingMusicFiles.map((track, index) => (
-                  <div key={index} className="text-sm text-zinc-300 p-2 rounded bg-zinc-800/50">
-                    {track.name}
-                  </div>
-                ))}
-              </div>
-
-              <button
-                onClick={confirmMusicSelection}
-                className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors"
-              >
-                Select This Folder
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Background Atmosphere */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
         <div className={cn(
           "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[120px] opacity-20 transition-colors duration-1000",
-          state.phase === 'work' ? "bg-emerald-500" : 
-          state.phase === 'rest' ? "bg-sky-500" : 
-          state.phase === 'prep' ? "bg-amber-500" : "bg-purple-500"
+          state.phase === 'work' ? "bg-[var(--phase-work)]" : 
+          state.phase === 'rest' ? "bg-[var(--phase-rest)]" : 
+          state.phase === 'prep' ? "bg-[var(--phase-prep)]" : "bg-[var(--phase-finished)]"
         )} />
       </div>
     </div>
@@ -1180,7 +1528,7 @@ function SidebarButton({ icon, label, onClick }: SidebarButtonProps) {
   return (
     <button 
       onClick={onClick}
-      className="w-full flex items-center gap-4 py-4 rounded-2xl text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-all group"
+      className="w-full flex items-center gap-4 py-4 rounded-2xl text-[var(--icon-secondary)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)]/50 transition-all group"
     >
       <span className="group-hover:scale-110 transition-transform duration-300">
         {icon}
@@ -1216,12 +1564,12 @@ function SettingRow({ label, value, onChange, unit = '' }: { label: string, valu
 
   return (
     <>
-      <span className="text-zinc-400 font-medium pr-10">{label}</span>
+      <span className="text-[var(--icon-secondary)] font-medium pr-10">{label}</span>
       
       <div className="">
         <button 
           onClick={() => onChange(Math.max(1, value - 1))}
-          className="w-10 h-10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+          className="w-10 h-10 flex items-center justify-center text-[var(--icon-secondary)] hover:text-[var(--text)] transition-colors"
         >
           <ChevronDown size={18} />
         </button>
@@ -1239,12 +1587,12 @@ function SettingRow({ label, value, onChange, unit = '' }: { label: string, valu
             onChange={(e) => setInputValue(e.target.value.replace(/[^0-9]/g, ''))}
             onBlur={handleBlur}
             onKeyDown={handleKeyDown}
-            className="w-full bg-zinc-800 border border-emerald-500/50 rounded text-center font-mono text-lg focus:outline-none"
+            className="w-full bg-[var(--surface)] border border-[var(--accent)]/50 rounded text-center font-mono text-lg focus:outline-none text-[var(--text)]"
           />
         ) : (
           <button 
             onClick={() => setIsEditing(true)}
-            className="w-full text-center font-mono text-lg hover:text-emerald-400 transition-colors cursor-text"
+            className="w-full text-center font-mono text-lg hover:text-[var(--accent)] transition-colors cursor-text text-[var(--text)]"
           >
             {value}{unit}
           </button>
@@ -1253,7 +1601,7 @@ function SettingRow({ label, value, onChange, unit = '' }: { label: string, valu
 
       <button 
         onClick={() => onChange(value + 1)}
-        className="w-10 h-10 flex items-center justify-center text-zinc-400 hover:text-white transition-colors"
+        className="w-10 h-10 flex items-center justify-center text-[var(--icon-secondary)] hover:text-[var(--text)] transition-colors"
       >
         <ChevronUp size={18} />
       </button>

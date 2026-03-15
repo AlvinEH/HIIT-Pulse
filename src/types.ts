@@ -13,7 +13,7 @@ export interface TimerState {
   phase: TimerPhase;
   currentRound: number;
   timeLeft: number;
-  isActive: boolean8;
+  isActive: boolean;
 }
 
 export interface SavedTimer extends TimerSettings {
