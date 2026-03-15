@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Pause, RotateCcw, Settings as SettingsIcon, ChevronUp, ChevronDown, Music, SkipForward, SkipBack, Save, Trash2, List, Pencil, Volume2, VolumeX, Menu, X, Check, Star, Image as ImageIcon, Sun, Moon, Crop, Timer } from 'lucide-react';
+import { Play, Pause, RotateCcw, Settings as SettingsIcon, ChevronUp, ChevronDown, Music, SkipForward, SkipBack, Save, Trash2, List, Pencil, Volume2, VolumeX, Menu, X, Check, Star, Image as ImageIcon, Sun, Moon, Crop, Timer, Plus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg } from '../utils/imageUtils';
@@ -43,6 +43,7 @@ export default function HIITTimer() {
   const [showAudioSettings, setShowAudioSettings] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
   const [showImageEditModal, setShowImageEditModal] = useState(false);
+  const [settingsOpenedFromSaved, setSettingsOpenedFromSaved] = useState(false);
   const [isCropping, setIsCropping] = useState(false);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -368,6 +369,10 @@ export default function HIITTimer() {
   const closeSettings = () => {
     setShowSettings(false);
     resetTimer();
+    if (settingsOpenedFromSaved) {
+      setShowSaved(true);
+      setSettingsOpenedFromSaved(false);
+    }
   };
 
   useEffect(() => {
@@ -805,7 +810,11 @@ export default function HIITTimer() {
                 <SidebarButton 
                   icon={<SettingsIcon size={20} className="text-[var(--accent)]" />} 
                   label="Timer Settings" 
-                  onClick={() => { setShowSettings(true); setShowSidebar(false); }} 
+                  onClick={() => { 
+                    setSettingsOpenedFromSaved(false); 
+                    setShowSettings(true); 
+                    setShowSidebar(false); 
+                  }} 
                 />
                 <SidebarButton 
                   icon={<Volume2 size={20} className="text-[var(--phase-rest)]" />} 
@@ -1447,13 +1456,27 @@ export default function HIITTimer() {
             >
               <div className="flex justify-between items-center mb-8">
                 <h2 className="text-xl font-medium text-[var(--text)]">Saved Timers</h2>
-                <button 
-                  onClick={() => setShowSaved(false)} 
-                  className="text-[var(--phase-finished)] hover:text-[var(--text)] transition-colors p-1"
-                  aria-label="Close saved timers"
-                >
-                  <X size={20} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => { 
+                      setSettingsOpenedFromSaved(true); 
+                      setShowSettings(true); 
+                      setShowSaved(false); 
+                    }} 
+                    className="text-[var(--accent)] hover:text-[var(--text)] transition-colors p-1"
+                    aria-label="Create new timer"
+                    title="Create new timer"
+                  >
+                    <Plus size={20} />
+                  </button>
+                  <button 
+                    onClick={() => setShowSaved(false)} 
+                    className="text-[var(--phase-finished)] hover:text-[var(--text)] transition-colors p-1"
+                    aria-label="Close saved timers"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
@@ -1526,7 +1549,7 @@ export default function HIITTimer() {
                                     "p-2 transition-all rounded-lg",
                                     Number(timer.isDefault) === 1 
                                       ? "text-[var(--accent)]" 
-                                      : "text-[var(--icon-secondary)]/40 hover:text-[var(--accent)] group-hover:opacity-100"
+                                      : "text-[var(--icon-secondary)]/40 hover:text-[var(--accent)] hover:bg-[var(--surface-hover)] group-hover:opacity-100"
                                   )}
                                   title={Number(timer.isDefault) === 1 ? "Remove as default" : "Set as default"}
                                 >
