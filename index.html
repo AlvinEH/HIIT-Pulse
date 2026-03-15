@@ -4,8 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>HIIT Pulse</title>
-    <script type="module" crossorigin src="/HIIT-Pulse/assets/index-D2SglPYO.js"></script>
-    <link rel="stylesheet" crossorigin href="/HIIT-Pulse/assets/index-9d2bTAmV.css">
+    <script>
+      (function() {
+        try {
+          const theme = localStorage.getItem('hiit-pulse-theme');
+          const supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (theme === 'light' || (!theme && !supportDarkMode)) {
+            document.documentElement.classList.add('light-mode');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="/HIIT-Pulse/assets/index-D0wRABMs.js"></script>
+    <link rel="stylesheet" crossorigin href="/HIIT-Pulse/assets/index-CR3kKADa.css">
   <link rel="manifest" href="/HIIT-Pulse/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/HIIT-Pulse/registerSW.js"></script></head>
   <body>
     <div id="root"></div>
