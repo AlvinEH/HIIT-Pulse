@@ -215,6 +215,35 @@ export default function HIITTimer() {
   // Track whether we've played the halfway sound for the current work phase
   const halfwayPlayedRef = useRef(false);
 
+  // Touch swipe tracking for mobile sidebar opening
+  const touchStartXRef = useRef<number | null>(null);
+  const touchStartYRef = useRef<number | null>(null);
+
+  const handleEdgeTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartXRef.current = touch.clientX;
+    touchStartYRef.current = touch.clientY;
+  };
+
+  const handleEdgeTouchMove = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartXRef.current;
+    const dy = touch.clientY - (touchStartYRef.current ?? 0);
+
+    // Swipe right from the left edge with a mostly horizontal gesture
+    if (dx > 60 && Math.abs(dy) < 50) {
+      setShowSidebar(true);
+      touchStartXRef.current = null;
+      touchStartYRef.current = null;
+    }
+  };
+
+  const handleEdgeTouchEnd = () => {
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+  };
+
   const fetchTimers = async () => {
     try {
       const res = await fetch('/api/timers');
@@ -748,15 +777,6 @@ export default function HIITTimer() {
                   >
                     <Pencil size={16} />
                   </button>
-                  <button 
-                    onClick={() => setShowSidebar(false)} 
-                    className={cn(
-                      "p-1.5 transition-colors duration-300",
-                      headerImage ? "text-white/80 hover:text-white" : "text-[var(--icon-secondary)] hover:text-[var(--text)]"
-                    )}
-                  >
-                    <X size={18} />
-                  </button>
                 </div>
               </div>
 
@@ -791,7 +811,7 @@ export default function HIITTimer() {
                 />
                 <SidebarButton 
                   icon={<Music size={20} className={playlist.length > 0 ? "text-[var(--accent)]" : "text-[var(--phase-prep)]"} />} 
-                  label="Music Library (Folder)" 
+                  label="Music Library" 
                   onClick={() => { fileInputRef.current?.click(); setShowSidebar(false); }} 
                 />
               </nav>
@@ -813,6 +833,9 @@ export default function HIITTimer() {
       <div 
         className="fixed top-0 left-0 bottom-0 w-4 z-[55] cursor-e-resize"
         onMouseEnter={() => !showSidebar && setShowSidebar(true)}
+        onTouchStart={handleEdgeTouchStart}
+        onTouchMove={handleEdgeTouchMove}
+        onTouchEnd={handleEdgeTouchEnd}
       />
 
       {/* Header */}
@@ -1561,7 +1584,7 @@ function SidebarButton({ icon, label, onClick }: SidebarButtonProps) {
   return (
     <button 
       onClick={onClick}
-      className="w-full flex items-center gap-4 py-4 rounded-2xl text-[var(--icon-secondary)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)]/50 transition-all group"
+      className="w-full flex items-center gap-4 py-4 pl-6 pr-4 rounded-2xl text-[var(--icon-secondary)] hover:text-[var(--text)] hover:bg-[var(--surface-hover)]/50 transition-all group"
     >
       <span className="group-hover:scale-110 transition-transform duration-300">
         {icon}
