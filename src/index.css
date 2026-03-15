@@ -90,12 +90,10 @@
 
 @layer base {
   html {
-    @apply transition-[background-color,color,border-color] duration-300 ease-in-out;
   }
 
   *, ::before, ::after {
     border-color: var(--border);
-    @apply transition-[background-color,color,border-color,fill,stroke] duration-300 ease-in-out;
   }
 
   body {
