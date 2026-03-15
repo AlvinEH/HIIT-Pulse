@@ -221,18 +221,21 @@ export default function HIITTimer() {
 
   const handleEdgeTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
+    // Only start tracking if touch begins in the leftmost 20px
+    if (touch.clientX > 100) return;
     touchStartXRef.current = touch.clientX;
     touchStartYRef.current = touch.clientY;
   };
 
   const handleEdgeTouchMove = (e: React.TouchEvent) => {
     if (touchStartXRef.current === null) return;
+    e.preventDefault(); // Prevent scrolling while swiping
     const touch = e.touches[0];
     const dx = touch.clientX - touchStartXRef.current;
     const dy = touch.clientY - (touchStartYRef.current ?? 0);
 
     // Swipe right from the left edge with a mostly horizontal gesture
-    if (dx > 60 && Math.abs(dy) < 50) {
+    if (dx > 40 && Math.abs(dy) < 80) {
       setShowSidebar(true);
       touchStartXRef.current = null;
       touchStartYRef.current = null;
