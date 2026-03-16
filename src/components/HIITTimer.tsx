@@ -1262,8 +1262,8 @@ export default function HIITTimer() {
                     type="text" 
                     placeholder="Timer Name" 
                     value={timerName}
-                    autoCapitalize="words"
                     onChange={(e) => setTimerName(e.target.value)}
+                    autoCapitalize="words"
                     className="flex-1 bg-[var(--surface-hover)] border border-[var(--border)] rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[var(--accent)] text-[var(--text)]"
                   />
                   <button 
@@ -1504,8 +1504,8 @@ export default function HIITTimer() {
                             autoFocus
                             type="text"
                             value={editingName}
-                            autoCapitalize="words"
                             onChange={(e) => setEditingName(e.target.value)}
+                            autoCapitalize="words"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') renameTimer(timer.id);
                               if (e.key === 'Escape') setEditingTimerId(null);
