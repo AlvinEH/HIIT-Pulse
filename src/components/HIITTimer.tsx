@@ -938,7 +938,7 @@ export default function HIITTimer() {
         </AnimatePresence>
 
         {/* Progress Ring */}
-        <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none">
+        <svg className="absolute inset-0 w-full h-full p-12 -rotate-90 pointer-events-none">
           {/* outer background */}
           <circle
             cx="50%"
