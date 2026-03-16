@@ -222,8 +222,8 @@ export default function HIITTimer() {
 
   const handleEdgeTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
-    // Only start tracking if touch begins in the leftmost 20px to avoid interfering with buttons
-    if (touch.clientX > 20) return;
+    // Only start tracking if touch begins in the leftmost 70px to avoid interfering with buttons
+    if (touch.clientX > 70) return;
     touchStartXRef.current = touch.clientX;
     touchStartYRef.current = touch.clientY;
   };
@@ -236,7 +236,7 @@ export default function HIITTimer() {
     const dy = touch.clientY - (touchStartYRef.current ?? 0);
 
     // Swipe right from the left edge with a mostly horizontal gesture
-    if (dx > 40 && Math.abs(dy) < 80) {
+    if (dx > 20 && Math.abs(dy) < 80) {
       setShowSidebar(true);
       touchStartXRef.current = null;
       touchStartYRef.current = null;
