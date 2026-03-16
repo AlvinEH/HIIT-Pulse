@@ -216,14 +216,14 @@ export default function HIITTimer() {
   // Track whether we've played the halfway sound for the current work phase
   const halfwayPlayedRef = useRef(false);
 
-  // Touch swipe tracking for mobile sidebar opening
+  // Touch swipe tracking for mobile sidebar opening/closing
   const touchStartXRef = useRef<number | null>(null);
   const touchStartYRef = useRef<number | null>(null);
 
   const handleEdgeTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
-    // Only start tracking if touch begins in the leftmost 20px
-    if (touch.clientX > 100) return;
+    // Only start tracking if touch begins in the leftmost area (up to menu button)
+    if (touch.clientX > 70) return;
     touchStartXRef.current = touch.clientX;
     touchStartYRef.current = touch.clientY;
   };
@@ -244,6 +244,31 @@ export default function HIITTimer() {
   };
 
   const handleEdgeTouchEnd = () => {
+    touchStartXRef.current = null;
+    touchStartYRef.current = null;
+  };
+
+  const handleSidebarTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartXRef.current = touch.clientX;
+    touchStartYRef.current = touch.clientY;
+  };
+
+  const handleSidebarTouchMove = (e: React.TouchEvent) => {
+    if (touchStartXRef.current === null) return;
+    const touch = e.touches[0];
+    const dx = touch.clientX - touchStartXRef.current;
+    const dy = touch.clientY - (touchStartYRef.current ?? 0);
+
+    // Swipe left to close sidebar with a mostly horizontal gesture
+    if (dx < -40 && Math.abs(dy) < 80) {
+      setShowSidebar(false);
+      touchStartXRef.current = null;
+      touchStartYRef.current = null;
+    }
+  };
+
+  const handleSidebarTouchEnd = () => {
     touchStartXRef.current = null;
     touchStartYRef.current = null;
   };
@@ -771,6 +796,9 @@ export default function HIITTimer() {
               exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="fixed top-0 left-0 bottom-0 w-65 bg-[var(--surface)] border-r border-[var(--border)] z-[70] flex flex-col shadow-2xl overflow-hidden"
+              onTouchStart={handleSidebarTouchStart}
+              onTouchMove={handleSidebarTouchMove}
+              onTouchEnd={handleSidebarTouchEnd}
             >
               {/* Top Bar (Branding & Close) */}
               <div className="absolute top-4 left-5 right-4 z-30 flex justify-between items-center">
@@ -848,9 +876,9 @@ export default function HIITTimer() {
         )}
       </AnimatePresence>
 
-      {/* Slide-from-left trigger area */}
+      {/* Slide-from-left trigger area - expanded to menu button */}
       <div 
-        className="fixed top-0 left-0 bottom-0 w-4 z-[55] cursor-e-resize"
+        className="fixed top-0 left-0 bottom-0 w-[70px] z-[55] cursor-e-resize"
         onMouseEnter={() => !showSidebar && setShowSidebar(true)}
         onTouchStart={handleEdgeTouchStart}
         onTouchMove={handleEdgeTouchMove}
@@ -1092,7 +1120,7 @@ export default function HIITTimer() {
                       setShowImageEditModal(false);
                     }
                   }} 
-                  className="p-2 text-[var(--accent)] hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
+                  className="p-2 text-[var(--accent)] hover:text-[var(--icon-hover)] hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
                 >
                   <X size={24} />
                 </button>
@@ -1223,7 +1251,7 @@ export default function HIITTimer() {
                 <h2 className="text-xl font-medium text-[var(--text)]">Timer Settings</h2>
                 <button 
                   onClick={closeSettings} 
-                  className="text-[var(--accent)] p-1 hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
+                  className="text-[var(--accent)] p-1 hover:text-[var(--icon-hover)] hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
                   aria-label="Close settings"
                 >
                   <X size={20} />
@@ -1301,7 +1329,7 @@ export default function HIITTimer() {
                 <h2 className="text-xl font-medium text-[var(--text)]">Audio Settings</h2>
                 <button 
                   onClick={() => setShowAudioSettings(false)} 
-                  className="text-[var(--accent)] p-1 hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
+                  className="text-[var(--accent)] p-1 hover:text-[var(--icon-hover)] hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
                   aria-label="Close audio settings"
                 >
                   <X size={20} />
@@ -1404,7 +1432,7 @@ export default function HIITTimer() {
                 <h2 className="text-xl font-medium text-[var(--text)]">Select This Folder</h2>
                 <button 
                   onClick={() => setShowMusicConfirm(false)} 
-                  className="text-[var(--accent)] p-1 hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
+                  className="text-[var(--accent)] p-1 hover:text-[var(--icon-hover)] hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
                 >
                   <X size={20} />
                 </button>
@@ -1471,7 +1499,7 @@ export default function HIITTimer() {
                       setShowSettings(true); 
                       setShowSaved(false); 
                     }} 
-                    className="text-[var(--accent)] p-1 hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
+                    className="text-[var(--accent)] p-1 hover:text-[var(--icon-hover)] hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
                     aria-label="Create new timer"
                     title="Create new timer"
                   >
@@ -1479,7 +1507,7 @@ export default function HIITTimer() {
                   </button>
                   <button 
                     onClick={() => setShowSaved(false)} 
-                    className="text-[var(--accent)] p-1 hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
+                    className="text-[var(--accent)] p-1 hover:text-[var(--icon-hover)] hover:bg-[var(--icon-secondary)]/10 rounded-lg transition-colors"
                     aria-label="Close saved timers"
                   >
                     <X size={20} />
@@ -1534,19 +1562,14 @@ export default function HIITTimer() {
                             aria-label={`Load ${timer.name}`}
                           />
                           <div className="relative z-10 pointer-events-none">
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <h3 className="font-medium text-[var(--text)]">{timer.name}</h3>
-                              {Number(timer.isDefault) === 1 && (
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)] bg-[var(--accent)]/10 px-1.5 py-0.5 rounded-md">
-                                  Default
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <div className="text-xs text-[var(--icon-secondary)]/60 space-y-0.5 font-medium">
-                                <div>{timer.rounds} Rounds</div>
-                                <div>{timer.workTime}s Work</div>
-                                <div>{timer.restTime}s Rest</div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-medium text-[var(--text)]">{timer.name}</h3>
+                                {Number(timer.isDefault) === 1 && (
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)] bg-[var(--accent)]/10 px-1.5 py-0.5 rounded-md">
+                                    Default
+                                  </span>
+                                )}
                               </div>
                               <div className="flex items-center gap-0.5 pointer-events-auto">
                                 <button
@@ -1586,6 +1609,11 @@ export default function HIITTimer() {
                                   <Trash2 size={16} />
                                 </button>
                               </div>
+                            </div>
+                            <div className="text-xs text-[var(--icon-secondary)]/60 space-y-0.5 font-medium">
+                              <div>{timer.rounds} Rounds</div>
+                              <div>{timer.workTime}s Work</div>
+                              <div>{timer.restTime}s Rest</div>
                             </div>
                           </div>
                         </div>
