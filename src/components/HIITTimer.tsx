@@ -892,7 +892,7 @@ export default function HIITTimer() {
       <div className="relative w-full max-w-md aspect-square flex flex-col items-center justify-center">
         {/* Slide-from-left trigger area - limited to progress circles height */}
         <div 
-          className="absolute top-0 left-0 bottom-0 w-6 z-10 cursor-e-resize"
+          className="absolute top-0 left-0 bottom-0 w-17 z-10 cursor-e-resize"
           onMouseEnter={() => !showSidebar && setShowSidebar(true)}
           onTouchStart={handleEdgeTouchStart}
           onTouchMove={handleEdgeTouchMove}
