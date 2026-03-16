@@ -889,7 +889,7 @@ export default function HIITTimer() {
       
 
       {/* Main Timer Display */}
-      <div className="relative w-full max-w-md aspect-square flex flex-col items-center justify-center">
+      <div className="relative w-full max-w-md aspect-square flex flex-col items-center justify-center p-12">
         {/* Slide-from-left trigger area - limited to progress circles height */}
         <div 
           className="absolute top-0 left-0 bottom-0 w-17 z-10 cursor-e-resize"
