@@ -946,7 +946,7 @@ export default function HIITTimer() {
             r="48%"
             fill="none"
             stroke="currentColor"
-            strokeWidth="6"
+            strokeWidth="12"
             className="text-[var(--surface)]"
           />
           
@@ -958,8 +958,8 @@ export default function HIITTimer() {
               r="48%"
               fill="none"
               stroke="currentColor"
-              strokeWidth="6"
-              strokeDasharray="100 100"
+              strokeWidth="12"
+              strokeDasharray="100"
               pathLength="100"
               animate={{ 
                 strokeDashoffset: 100 - (state.timeLeft / (
@@ -980,7 +980,7 @@ export default function HIITTimer() {
             r="45%"
             fill="none"
             stroke="currentColor"
-            strokeWidth="6"
+            strokeWidth="4"
             className="text-[var(--surface)]/50"
           />
           
@@ -991,7 +991,7 @@ export default function HIITTimer() {
             r="45%"
             fill="none"
             stroke="currentColor"
-            strokeWidth="6"
+            strokeWidth="4"
             strokeDasharray="100 100"
             pathLength="100"
             animate={{ strokeDashoffset: 100 - totalProgress * 100 }}
