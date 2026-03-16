@@ -889,7 +889,7 @@ export default function HIITTimer() {
       
 
       {/* Main Timer Display */}
-      <div className="relative w-full max-w-md aspect-square flex flex-col items-center justify-center p-12">
+      <div className="relative w-full max-w-md aspect-square flex flex-col items-center justify-center p-4">
         {/* Slide-from-left trigger area - limited to progress circles height */}
         <div 
           className="absolute top-0 left-0 bottom-0 w-17 z-10 cursor-e-resize"
@@ -938,12 +938,12 @@ export default function HIITTimer() {
         </AnimatePresence>
 
         {/* Progress Ring */}
-        <svg className="absolute inset-0 w-full h-full p-12 -rotate-90 pointer-events-none">
+        <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none">
           {/* outer background */}
           <circle
             cx="50%"
             cy="50%"
-            r="48%"
+            r="46%"
             fill="none"
             stroke="currentColor"
             strokeWidth="12"
@@ -955,7 +955,7 @@ export default function HIITTimer() {
             <motion.circle
               cx="50%"
               cy="50%"
-              r="48%"
+              r="46%"
               fill="none"
               stroke="currentColor"
               strokeWidth="12"
@@ -977,7 +977,7 @@ export default function HIITTimer() {
           <circle
             cx="50%"
             cy="50%"
-            r="45%"
+            r="43%"
             fill="none"
             stroke="currentColor"
             strokeWidth="4"
@@ -988,7 +988,7 @@ export default function HIITTimer() {
           <motion.circle
             cx="50%"
             cy="50%"
-            r="45%"
+            r="43%"
             fill="none"
             stroke="currentColor"
             strokeWidth="4"
