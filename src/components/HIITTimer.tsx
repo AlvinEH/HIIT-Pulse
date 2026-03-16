@@ -222,8 +222,8 @@ export default function HIITTimer() {
 
   const handleEdgeTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
-    // Only start tracking if touch begins in the leftmost area (up to menu button)
-    if (touch.clientX > 70) return;
+    // Only start tracking if touch begins in the leftmost 20px to avoid interfering with buttons
+    if (touch.clientX > 20) return;
     touchStartXRef.current = touch.clientX;
     touchStartYRef.current = touch.clientY;
   };
@@ -443,14 +443,22 @@ export default function HIITTimer() {
     }
 
     return () => clearInterval(interval);
-  }, [state.isActive, state.timeLeft <= 0, settings.workTime, soundVolume, soundType]);
+  }, [state.isActive, settings.workTime, soundVolume, soundType, playBeep]);
   
   // Reset halfway flag whenever the phase, round or work duration changes
   useEffect(() => {
     halfwayPlayedRef.current = false;
   }, [state.phase, state.currentRound, settings.workTime]);
 
-  const handlePhaseTransition = () => {
+  const playTripleBeep = useCallback((count = 3, intervalMs = 100) => {
+    for (let i = 0; i < count; i++) {
+      setTimeout(() => {
+        playBeep(880, 0.08, soundVolume, soundType);
+      }, i * intervalMs);
+    }
+  }, [playBeep, soundVolume, soundType]);
+
+  const handlePhaseTransition = useCallback(() => {
     setState((prev) => {
       let nextPhase: TimerPhase = prev.phase;
       let nextRound = prev.currentRound;
@@ -486,7 +494,7 @@ export default function HIITTimer() {
         isActive: nextPhase !== 'finished',
       };
     });
-  };
+  }, [settings.workTime, settings.restTime, settings.rounds, soundVolume, soundType, playPhaseTransition, playTripleBeep]);
 
   const toggleTimer = () => {
     if (state.phase === 'finished') {
@@ -717,14 +725,6 @@ export default function HIITTimer() {
     }
   };
 
-  const playTripleBeep = (count = 3, intervalMs = 100) => {
-    for (let i = 0; i < count; i++) {
-      setTimeout(() => {
-        playBeep(880, 0.08, soundVolume, soundType);
-      }, i * intervalMs);
-    }
-  };
-
   // total progress calculation (prep + all rounds; last round has no rest)
   const totalDuration = settings.prepTime + settings.rounds * settings.workTime + Math.max(0, settings.rounds - 1) * settings.restTime;
   const totalElapsed = (() => {
@@ -752,7 +752,6 @@ export default function HIITTimer() {
         <audio 
           ref={audioRef}
           src={playlist[currentTrackIndex].url}
-          volume={musicVolume}
           onEnded={nextTrack}
           onPlay={() => setIsMusicPlaying(true)}
           onPause={() => setIsMusicPlaying(false)}
@@ -765,8 +764,7 @@ export default function HIITTimer() {
         ref={fileInputRef} 
         onChange={handleFolderSelect} 
         multiple 
-        webkitdirectory="" 
-        directory="" 
+        {...({ webkitdirectory: '', directory: '' } as any)}
         accept="audio/*" 
         className="hidden" 
       />
@@ -876,9 +874,9 @@ export default function HIITTimer() {
         )}
       </AnimatePresence>
 
-      {/* Slide-from-left trigger area - expanded to menu button */}
+      {/* Slide-from-left trigger area - narrowed to avoid menu button */}
       <div 
-        className="fixed top-0 left-0 bottom-0 w-[70px] z-[55] cursor-e-resize"
+        className="fixed top-0 left-0 bottom-0 w-6 z-[55] cursor-e-resize"
         onMouseEnter={() => !showSidebar && setShowSidebar(true)}
         onTouchStart={handleEdgeTouchStart}
         onTouchMove={handleEdgeTouchMove}
