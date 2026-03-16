@@ -874,15 +874,6 @@ export default function HIITTimer() {
         )}
       </AnimatePresence>
 
-      {/* Slide-from-left trigger area - narrowed to avoid menu button */}
-      <div 
-        className="fixed top-0 left-0 bottom-0 w-6 z-[55] cursor-e-resize"
-        onMouseEnter={() => !showSidebar && setShowSidebar(true)}
-        onTouchStart={handleEdgeTouchStart}
-        onTouchMove={handleEdgeTouchMove}
-        onTouchEnd={handleEdgeTouchEnd}
-      />
-
       {/* Header */}
       <div className="absolute top-8 left-8 right-8 flex justify-between items-center">
         <div className="flex gap-4 items-center">
@@ -899,6 +890,14 @@ export default function HIITTimer() {
 
       {/* Main Timer Display */}
       <div className="relative w-full max-w-md aspect-square flex flex-col items-center justify-center">
+        {/* Slide-from-left trigger area - limited to progress circles height */}
+        <div 
+          className="absolute top-0 left-0 bottom-0 w-6 z-10 cursor-e-resize"
+          onMouseEnter={() => !showSidebar && setShowSidebar(true)}
+          onTouchStart={handleEdgeTouchStart}
+          onTouchMove={handleEdgeTouchMove}
+          onTouchEnd={handleEdgeTouchEnd}
+        />
         <AnimatePresence mode="wait">
           <motion.div
             key={state.phase}
