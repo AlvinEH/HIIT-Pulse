@@ -843,8 +843,6 @@ export default function HIITTimer() {
         const timeout = setTimeout(() => {
           setCurrentWorkoutStep(nextStepIndex);
           
-          // Load the next step's timer settings
-          const nextStep = currentWorkout.steps[nextStepIndex];
           // Load the next set's timer settings
           const nextSet = currentWorkout.steps[nextStepIndex];
           const stepTimer = nextSet.timerId 
