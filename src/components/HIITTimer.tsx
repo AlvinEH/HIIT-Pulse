@@ -89,27 +89,6 @@ export default function HIITTimer() {
 
   const { playPhaseTransition, playBeep } = useAudio();
 
-  // Helper function to play beeps with music ducking
-  const playBeepWithMusicDucking = useCallback(async (frequency: number, duration: number, volume: number, soundType: SoundType) => {
-    const originalVolume = musicVolume;
-    const duckingVolume = originalVolume * 0.3; // Reduce music volume to 30% of original
-    
-    // Lower music volume if music is playing
-    if (audioRef.current && !audioRef.current.paused && originalVolume > 0) {
-      audioRef.current.volume = duckingVolume;
-    }
-    
-    // Play the beep
-    await playBeep(frequency, duration, volume, soundType);
-    
-    // Restore music volume after a short delay
-    setTimeout(() => {
-      if (audioRef.current && !audioRef.current.paused) {
-        audioRef.current.volume = originalVolume;
-      }
-    }, (duration * 1000) + 100); // Restore 100ms after beep ends
-  }, [musicVolume, playBeep]);
-
   useEffect(() => {
     localStorage.setItem('hiit-pulse-theme', isDarkMode ? 'dark' : 'light');
     localStorage.setItem('hiit-pulse-color-theme', selectedTheme);
@@ -243,23 +222,8 @@ export default function HIITTimer() {
   }, [headerImage, isDarkMode, cachedThemeColors, selectedTheme]);
 
   const displayRound = state.phase === 'prep' ? 0 : state.currentRound;
-
-  useEffect(() => {
-    localStorage.setItem('hiit-sound-type', soundType);
-  }, [soundType]);
-
-  useEffect(() => {
-    localStorage.setItem('hiit-sound-volume', soundVolume.toString());
-  }, [soundVolume]);
-
-  useEffect(() => {
-    localStorage.setItem('hiit-music-volume', musicVolume.toString());
-    if (audioRef.current) {
-      audioRef.current.volume = musicVolume;
-    }
-  }, [musicVolume]);
-
-  // Music State
+  
+    // Music State
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
@@ -270,6 +234,20 @@ export default function HIITTimer() {
   const headerImageInputRef = useRef<HTMLInputElement>(null);
 
   const isFirstLoad = useRef(true);
+
+  useEffect(() => {
+    localStorage.setItem('hiit-sound-type', soundType);
+  }, [soundType]);
+
+  useEffect(() => {
+    localStorage.setItem('hiit-sound-volume', soundVolume.toString());
+  }, [soundVolume]);
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = musicVolume;
+    }
+  }, [playlist.length, currentTrackIndex, musicVolume]);
 
   // Track whether we've played the halfway sound for the current work phase
   const halfwayPlayedRef = useRef(false);
@@ -523,7 +501,7 @@ export default function HIITTimer() {
           if (prev.phase === 'work') {
             const halfPointMs = (settings.workTime * 1000) / 2;
             if (prev.timeLeft > halfPointMs && nextTime <= halfPointMs && !halfwayPlayedRef.current) {
-              playBeepWithMusicDucking(880, 0.08, soundVolume, soundType);
+              playBeep(880, 0.08, soundVolume, soundType);
               halfwayPlayedRef.current = true;
             }
           }
@@ -532,7 +510,7 @@ export default function HIITTimer() {
           const nextSec = Math.ceil(nextTime / 1000);
           
           if (prevSec !== nextSec && nextSec <= 3 && nextSec > 0) {
-            playBeepWithMusicDucking(330, 0.05, soundVolume, soundType);
+            playBeep(330, 0.05, soundVolume, soundType);
           }
           return { ...prev, timeLeft: nextTime };
         });
@@ -542,7 +520,7 @@ export default function HIITTimer() {
     }
 
     return () => clearInterval(interval);
-  }, [state.isActive, settings.workTime, soundVolume, soundType, playBeepWithMusicDucking]);
+  }, [state.isActive, settings.workTime, soundVolume, soundType, playBeep]);
   
   // Reset halfway flag whenever the phase, round or work duration changes
   useEffect(() => {
@@ -552,10 +530,10 @@ export default function HIITTimer() {
   const playTripleBeep = useCallback((count = 3, intervalMs = 100) => {
     for (let i = 0; i < count; i++) {
       setTimeout(() => {
-        playBeepWithMusicDucking(880, 0.08, soundVolume, soundType);
+        playBeep(880, 0.08, soundVolume, soundType);
       }, i * intervalMs);
     }
-  }, [playBeepWithMusicDucking, soundVolume, soundType]);
+  }, [playBeep, soundVolume, soundType]);
 
   const handlePhaseTransition = useCallback(() => {
     setState((prev) => {

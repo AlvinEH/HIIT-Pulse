@@ -4,7 +4,7 @@ import { SoundType } from '../types';
 export const useAudio = () => {
   const audioCtx = useRef<AudioContext | null>(null);
 
-  const playBeep = async (frequency: number = 440, duration: number = 0.1, volume: number = 0.5, type: SoundType = 'beep') => {
+  const playBeep = async (frequency: number = 440, duration: number = 0.1, volume: number = 0.8, type: SoundType = 'beep') => {
     try {
       if (!audioCtx.current) {
         audioCtx.current = new (window.AudioContext || (window as any).webkitAudioContext)();
