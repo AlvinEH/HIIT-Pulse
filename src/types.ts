@@ -22,3 +22,17 @@ export interface SavedTimer extends TimerSettings {
   isDefault?: number;
   createdAt: string;
 }
+
+export interface WorkoutStep {
+  id: number;
+  timerId?: number; // Reference to a saved timer
+  customSettings?: TimerSettings; // Or custom timer settings
+  name: string;
+}
+
+export interface Workout {
+  id: number;
+  name: string;
+  steps: WorkoutStep[];
+  createdAt: string;
+}

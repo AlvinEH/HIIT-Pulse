@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { Play, Pause, RotateCcw, Settings as SettingsIcon, ChevronUp, ChevronDown, Music, SkipForward, SkipBack, Save, Trash2, List, Pencil, Volume2, VolumeX, Menu, X, Check, Star, Image as ImageIcon, Sun, Moon, Crop, Timer, Plus } from 'lucide-react';
+import { Play, Pause, RotateCcw, Settings as SettingsIcon, ChevronUp, ChevronDown, Music, SkipForward, SkipBack, Save, Trash2, List, Pencil, Volume2, VolumeX, Menu, X, Check, Star, Image as ImageIcon, Sun, Moon, Crop, Timer, Plus, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg } from '../utils/imageUtils';
-import { TimerSettings, TimerState, TimerPhase, SavedTimer, SoundType } from '../types';
+import { TimerSettings, TimerState, TimerPhase, SavedTimer, SoundType, Workout, WorkoutStep } from '../types';
 import { useAudio } from '../hooks/useAudio';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -82,6 +82,17 @@ export default function HIITTimer() {
     const saved = localStorage.getItem('hiit-pulse-color-theme');
     return (saved as any) || 'catppuccin';
   });
+
+  // Workout composer states
+  const [showWorkoutComposer, setShowWorkoutComposer] = useState(false);
+  const [savedWorkouts, setSavedWorkouts] = useState<Workout[]>([]);
+  const [showSavedWorkoutsModal, setShowSavedWorkoutsModal] = useState(false);
+  const [expandedWorkouts, setExpandedWorkouts] = useState<Set<number>>(new Set());
+  const [currentWorkout, setCurrentWorkout] = useState<Workout | null>(null);
+  const [isRunningWorkout, setIsRunningWorkout] = useState(false);
+  const [currentWorkoutStep, setCurrentWorkoutStep] = useState(0);
+  const [newWorkoutName, setNewWorkoutName] = useState('');
+  const [newWorkoutSteps, setNewWorkoutSteps] = useState<WorkoutStep[]>([]);
 
   // Prefetch and cache theme color values to ensure seamless transitions
   // and availability for JS-driven animations if needed
@@ -222,7 +233,7 @@ export default function HIITTimer() {
   }, [headerImage, isDarkMode, cachedThemeColors, selectedTheme]);
 
   const displayRound = state.phase === 'prep' ? 0 : state.currentRound;
-  
+
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
@@ -801,6 +812,145 @@ export default function HIITTimer() {
     }
   };
 
+  // Workout management functions
+  const loadSavedWorkouts = useCallback(() => {
+    const saved = localStorage.getItem('hiit-saved-workouts');
+    if (saved) {
+      try {
+        setSavedWorkouts(JSON.parse(saved));
+      } catch (error) {
+        console.error('Error loading saved workouts:', error);
+      }
+    }
+  }, []);
+
+  const saveWorkoutsToStorage = useCallback((workouts: Workout[]) => {
+    localStorage.setItem('hiit-saved-workouts', JSON.stringify(workouts));
+    setSavedWorkouts(workouts);
+  }, []);
+
+  useEffect(() => {
+    loadSavedWorkouts();
+  }, [loadSavedWorkouts]);
+
+  // Handle workout progression when a timer completes
+  useEffect(() => {
+    if (state.phase === 'finished' && isRunningWorkout && currentWorkout) {
+      const nextStepIndex = currentWorkoutStep + 1;
+      
+      if (nextStepIndex < currentWorkout.steps.length) {
+        // Move to next step after a short delay
+        const timeout = setTimeout(() => {
+          setCurrentWorkoutStep(nextStepIndex);
+          
+          // Load the next step's timer settings
+          const nextStep = currentWorkout.steps[nextStepIndex];
+          const stepTimer = nextStep.timerId 
+            ? savedTimers.find(t => t.id === nextStep.timerId)
+            : null;
+          
+          if (stepTimer || nextStep.customSettings) {
+            const stepSettings = stepTimer || nextStep.customSettings!;
+            setSettings(stepSettings);
+            setState({
+              phase: 'prep',
+              currentRound: 1,
+              timeLeft: stepSettings.prepTime * 1000,
+              isActive: false
+            });
+          }
+        }, 2000); // 2 second delay between steps
+
+        return () => clearTimeout(timeout);
+      } else {
+        // Workout complete
+        const timeout = setTimeout(() => {
+          setIsRunningWorkout(false);
+          setCurrentWorkout(null);
+          setCurrentWorkoutStep(0);
+        }, 3000); // Show completion for 3 seconds
+
+        return () => clearTimeout(timeout);
+      }
+    }
+  }, [state.phase, isRunningWorkout, currentWorkout, currentWorkoutStep, savedTimers]);
+
+  const addTimerToWorkout = useCallback((timer: SavedTimer) => {
+    const newStep: WorkoutStep = {
+      id: Date.now() + Math.random(),
+      timerId: timer.id,
+      name: timer.name
+    };
+    setNewWorkoutSteps(prev => [...prev, newStep]);
+  }, []);
+
+  const removeStepFromWorkout = useCallback((stepId: number) => {
+    setNewWorkoutSteps(prev => prev.filter(step => step.id !== stepId));
+  }, []);
+
+  const saveNewWorkout = useCallback(() => {
+    if (!newWorkoutName.trim() || newWorkoutSteps.length === 0) return;
+
+    const newWorkout: Workout = {
+      id: Date.now(),
+      name: newWorkoutName.trim(),
+      steps: newWorkoutSteps,
+      createdAt: new Date().toISOString()
+    };
+
+    const updatedWorkouts = [...savedWorkouts, newWorkout];
+    saveWorkoutsToStorage(updatedWorkouts);
+    
+    // Reset form
+    setNewWorkoutName('');
+    setNewWorkoutSteps([]);
+    setShowWorkoutComposer(false);
+  }, [newWorkoutName, newWorkoutSteps, savedWorkouts, saveWorkoutsToStorage]);
+
+  const deleteWorkout = useCallback((workoutId: number) => {
+    const updatedWorkouts = savedWorkouts.filter(w => w.id !== workoutId);
+    saveWorkoutsToStorage(updatedWorkouts);
+  }, [savedWorkouts, saveWorkoutsToStorage]);
+
+  const startWorkout = useCallback((workout: Workout) => {
+    if (workout.steps.length === 0) return;
+
+    setCurrentWorkout(workout);
+    setCurrentWorkoutStep(0);
+    setIsRunningWorkout(true);
+    
+    // Load the first step's timer settings
+    const firstStep = workout.steps[0];
+    const stepTimer = firstStep.timerId 
+      ? savedTimers.find(t => t.id === firstStep.timerId)
+      : null;
+    
+    if (stepTimer || firstStep.customSettings) {
+      const stepSettings = stepTimer || firstStep.customSettings!;
+      setSettings(stepSettings);
+      setState({
+        phase: 'prep',
+        currentRound: 1,
+        timeLeft: stepSettings.prepTime * 1000,
+        isActive: false
+      });
+    }
+    
+    setShowSavedWorkoutsModal(false);
+  }, [savedTimers]);
+
+  const toggleWorkoutExpansion = useCallback((workoutId: number) => {
+    setExpandedWorkouts(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(workoutId)) {
+        newSet.delete(workoutId);
+      } else {
+        newSet.add(workoutId);
+      }
+      return newSet;
+    });
+  }, []);
+
   // total progress calculation (prep + all rounds; last round has no rest)
   const totalDuration = settings.prepTime + settings.rounds * settings.workTime + Math.max(0, settings.rounds - 1) * settings.restTime;
   const totalElapsed = (() => {
@@ -926,6 +1076,19 @@ export default function HIITTimer() {
                   }} 
                 />
                 <SidebarButton 
+                  icon={<Layers size={20} className="text-[var(--phase-work)]" />} 
+                  label="Saved Workouts"
+                  onClick={() => { setShowSavedWorkoutsModal(true); setShowSidebar(false); }} 
+                />
+                <SidebarButton 
+                  icon={<Plus size={20} className="text-[var(--accent)]" />} 
+                  label="Create Workout" 
+                  onClick={() => { 
+                    setShowWorkoutComposer(true); 
+                    setShowSidebar(false); 
+                  }} 
+                />
+                <SidebarButton 
                   icon={<Volume2 size={20} className="text-[var(--phase-rest)]" />} 
                   label="Audio Settings" 
                   onClick={() => { setShowAudioSettings(true); setShowSidebar(false); }} 
@@ -1025,6 +1188,22 @@ export default function HIITTimer() {
 
       {/* Main Timer Display */}
       <div className="relative w-full max-w-md aspect-square flex flex-col items-center justify-center p-4">
+        {/* Workout Progress Indicator */}
+        {isRunningWorkout && currentWorkout && (
+          <div className="absolute -top-16 left-1/2 transform -translate-x-1/2 text-center z-20">
+            <div className={cn("text-xs font-mono tracking-[0.3em] mb-1", getPhaseColor(state.phase))}>
+              {currentWorkout.name.toUpperCase()}
+            </div>
+            <div className={cn("text-xs font-mono tracking-[0.3em]", getPhaseColor(state.phase))}>
+              {currentWorkoutStep >= currentWorkout.steps.length ? (
+                <span className="text-[var(--phase-finished)]">WORKOUT COMPLETE! ✨</span>
+              ) : (
+                <>SET {currentWorkoutStep + 1} OF {currentWorkout.steps.length}</>
+              )}
+            </div>
+          </div>
+        )}
+        
         {/* Slide-from-left trigger area - limited to progress circles height, extends to right edge of menu icon */}
         <div 
           className="absolute top-0 left-0 bottom-0 w-17 z-10 cursor-e-resize"
@@ -1779,9 +1958,10 @@ export default function HIITTimer() {
                               </div>
                             </div>
                             <div className="text-xs text-[var(--icon-secondary)]/60 space-y-0.5 font-medium">
-                              <div>{timer.rounds} Rounds</div>
+                              <div>{timer.prepTime}s Prep</div>
                               <div>{timer.workTime}s Work</div>
                               <div>{timer.restTime}s Rest</div>
+                              <div>{timer.rounds} Rounds</div>
                             </div>
                           </div>
                         </div>
@@ -1792,6 +1972,289 @@ export default function HIITTimer() {
               </div>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Workout Composer Modal */}
+      <AnimatePresence>
+        {showWorkoutComposer && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowWorkoutComposer(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[80vh] bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-2xl z-[70] flex flex-col overflow-hidden"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
+                <h2 className="text-xl font-bold text-[var(--text)]">Workout Composer</h2>
+                <button
+                  onClick={() => setShowWorkoutComposer(false)}
+                  className="p-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="space-y-4">
+                  {/* Workout Name Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text)] mb-2">
+                      Workout Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={newWorkoutName}
+                      onChange={(e) => setNewWorkoutName(e.target.value)}
+                      placeholder="Enter workout name"
+                      required
+                      className={`w-full px-3 py-2 bg-[var(--bg)] border rounded-lg text-[var(--text)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${
+                        newWorkoutName.trim() === '' ? 'border-red-400/50' : 'border-[var(--border)]'
+                      }`}
+                    />
+                  </div>
+
+                  {/* Timer Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text)] mb-2">
+                      Add Timer Steps
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                      {savedTimers.map(timer => (
+                        <button
+                          key={timer.id}
+                          onClick={() => addTimerToWorkout(timer)}
+                          className="p-3 bg-[var(--bg)] hover:bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg text-left transition-colors"
+                        >
+                          <div className="font-medium text-[var(--text)]">{timer.name}</div>
+                          <div className="text-xs text-[var(--text-secondary)] space-y-1">
+                            <div>{timer.prepTime}s Prep • {timer.workTime}s Work</div>
+                            <div>{timer.restTime}s Rest • {timer.rounds} Rounds</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Current Workout Steps */}
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text)] mb-2">
+                      Workout Steps ({newWorkoutSteps.length})
+                    </label>
+                    <div className="space-y-2 min-h-[100px] p-3 bg-[var(--bg)] border border-[var(--border)] rounded-lg">
+                      {newWorkoutSteps.length === 0 ? (
+                        <div className="text-center text-[var(--text-secondary)]">
+                          Click on saved timers above to add them to your workout
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {newWorkoutSteps.map((step, index) => (
+                            <div key={step.id} className="flex items-center justify-between p-2 bg-[var(--surface)] border border-[var(--border)] rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-mono text-[var(--text-secondary)] bg-[var(--bg)] px-2 py-1 rounded">
+                                  {index + 1}
+                                </span>
+                                <span className="text-[var(--text)] font-medium">
+                                  {step.name}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => removeStepFromWorkout(step.id)}
+                                className="p-1 text-[var(--text-secondary)] hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end gap-3 p-6 border-t border-[var(--border)]">
+                <button
+                  onClick={() => setShowWorkoutComposer(false)}
+                  className="px-4 py-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveNewWorkout}
+                  disabled={!newWorkoutName.trim() || newWorkoutSteps.length === 0}
+                  className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Save Workout
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Saved Workouts Modal */}
+      <AnimatePresence>
+        {showSavedWorkoutsModal && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowSavedWorkoutsModal(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[80vh] bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-2xl z-[70] flex flex-col overflow-hidden"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
+                <h2 className="text-xl font-bold text-[var(--text)]">Saved Workouts</h2>
+                <button
+                  onClick={() => setShowSavedWorkoutsModal(false)}
+                  className="p-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="space-y-2">
+                  {savedWorkouts.length === 0 ? (
+                    <div className="text-center text-[var(--text-secondary)] py-8">
+                      <p className="mb-4">No saved workouts yet</p>
+                      <button
+                        onClick={() => {
+                          setShowSavedWorkoutsModal(false);
+                          setShowWorkoutComposer(true);
+                        }}
+                        className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
+                      >
+                        Create Your First Workout
+                      </button>
+                    </div>
+                  ) : (
+                    savedWorkouts.map(workout => {
+                      const isExpanded = expandedWorkouts.has(workout.id);
+                      return (
+                        <div key={workout.id} className="p-4 bg-[var(--bg)] border border-[var(--border)] rounded-lg">
+                          <div 
+                            className="flex items-start justify-between mb-2 cursor-pointer"
+                            onClick={() => toggleWorkoutExpansion(workout.id)}
+                          >
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium text-[var(--text)]">{workout.name}</h4>
+                                <motion.div
+                                  animate={{ rotate: isExpanded ? 180 : 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="text-[var(--text-secondary)]"
+                                >
+                                  <ChevronDown size={16} />
+                                </motion.div>
+                              </div>
+                              <p className="text-sm text-[var(--text-secondary)]">
+                                {workout.steps.length} steps • Created {new Date(workout.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="flex gap-2 ml-3">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startWorkout(workout);
+                                }}
+                                className="p-2 text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors"
+                                title="Start Workout"
+                              >
+                                <Play size={16} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteWorkout(workout.id);
+                                }}
+                                className="p-2 text-[var(--text-secondary)] hover:text-red-500 transition-colors"
+                                title="Delete Workout"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                          <AnimatePresence>
+                            {isExpanded && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                transition={{ duration: 0.2 }}
+                                className="space-y-1 overflow-hidden"
+                              >
+                                {workout.steps.map((step, index) => {
+                                  const stepTimer = step.timerId 
+                                    ? savedTimers.find(t => t.id === step.timerId)
+                                    : null;
+                                  const timerSettings = stepTimer || step.customSettings;
+                                  
+                                  return (
+                                    <div key={step.id} className="text-sm text-[var(--text-secondary)] flex items-center gap-2 pt-2">
+                                      <span className="text-xs font-mono bg-[var(--surface)] px-1.5 py-0.5 rounded">
+                                        {index + 1}
+                                      </span>
+                                      <span className="flex-1">
+                                        {step.name}
+                                        {timerSettings && (
+                                          <span className="text-xs text-[var(--text-secondary)]/80 ml-2">
+                                            • {timerSettings.prepTime}s Prep • {timerSettings.workTime}s Work • {timerSettings.restTime}s Rest • {timerSettings.rounds} Rounds
+                                          </span>
+                                        )}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end gap-3 p-6 border-t border-[var(--border)]">
+                <button
+                  onClick={() => setShowSavedWorkoutsModal(false)}
+                  className="px-4 py-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSavedWorkoutsModal(false);
+                    setShowWorkoutComposer(true);
+                  }}
+                  className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)] transition-colors"
+                >
+                  New Workout
+                </button>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
 
