@@ -845,18 +845,20 @@ export default function HIITTimer() {
           
           // Load the next step's timer settings
           const nextStep = currentWorkout.steps[nextStepIndex];
-          const stepTimer = nextStep.timerId 
-            ? savedTimers.find(t => t.id === nextStep.timerId)
+          // Load the next set's timer settings
+          const nextSet = currentWorkout.steps[nextStepIndex];
+          const stepTimer = nextSet.timerId 
+            ? savedTimers.find(t => t.id === nextSet.timerId)
             : null;
           
-          if (stepTimer || nextStep.customSettings) {
-            const stepSettings = stepTimer || nextStep.customSettings!;
+          if (stepTimer || nextSet.customSettings) {
+            const stepSettings = stepTimer || nextSet.customSettings!;
             setSettings(stepSettings);
             setState({
               phase: 'prep',
               currentRound: 1,
               timeLeft: stepSettings.prepTime * 1000,
-              isActive: false
+              isActive: true
             });
           }
         }, 2000); // 2 second delay between steps
@@ -932,7 +934,7 @@ export default function HIITTimer() {
         phase: 'prep',
         currentRound: 1,
         timeLeft: stepSettings.prepTime * 1000,
-        isActive: false
+        isActive: true
       });
     }
     
@@ -952,8 +954,64 @@ export default function HIITTimer() {
   }, []);
 
   // total progress calculation (prep + all rounds; last round has no rest)
-  const totalDuration = settings.prepTime + settings.rounds * settings.workTime + Math.max(0, settings.rounds - 1) * settings.restTime;
+  const getSingleTimerDuration = (timerSettings: TimerSettings) => {
+    return timerSettings.prepTime + timerSettings.rounds * timerSettings.workTime + Math.max(0, timerSettings.rounds - 1) * timerSettings.restTime;
+  };
+
+  const totalDuration = isRunningWorkout && currentWorkout 
+    ? currentWorkout.steps.reduce((total, step) => {
+        const stepTimer = step.timerId ? savedTimers.find(t => t.id === step.timerId) : null;
+        const timerSettings = stepTimer || step.customSettings;
+        if (timerSettings) {
+          return total + getSingleTimerDuration(timerSettings);
+        }
+        return total;
+      }, 0)
+    : settings.prepTime + settings.rounds * settings.workTime + Math.max(0, settings.rounds - 1) * settings.restTime;
+
   const totalElapsed = (() => {
+    if (isRunningWorkout && currentWorkout) {
+      // Calculate elapsed time for completed workout steps
+      let completedDuration = 0;
+      for (let i = 0; i < currentWorkoutStep; i++) {
+        const step = currentWorkout.steps[i];
+        const stepTimer = step.timerId ? savedTimers.find(t => t.id === step.timerId) : null;
+        const timerSettings = stepTimer || step.customSettings;
+        if (timerSettings) {
+          completedDuration += getSingleTimerDuration(timerSettings);
+        }
+      }
+
+      // Add current step's elapsed time
+      const currentStep = currentWorkout.steps[currentWorkoutStep];
+      if (currentStep) {
+        const stepTimer = currentStep.timerId ? savedTimers.find(t => t.id === currentStep.timerId) : null;
+        const timerSettings = stepTimer || currentStep.customSettings || settings;
+        
+        const timeLeftSec = state.timeLeft / 1000;
+        const currentStepElapsed = (() => {
+          if (state.phase === 'prep') {
+            return Math.max(0, timerSettings.prepTime - timeLeftSec);
+          }
+          if (state.phase === 'work') {
+            return timerSettings.prepTime + (state.currentRound - 1) * (timerSettings.workTime + timerSettings.restTime) + Math.max(0, timerSettings.workTime - timeLeftSec);
+          }
+          if (state.phase === 'rest') {
+            return timerSettings.prepTime + (state.currentRound - 1) * (timerSettings.workTime + timerSettings.restTime) + timerSettings.workTime + Math.max(0, timerSettings.restTime - timeLeftSec);
+          }
+          if (state.phase === 'finished') {
+            return getSingleTimerDuration(timerSettings);
+          }
+          return 0;
+        })();
+        
+        return completedDuration + currentStepElapsed;
+      }
+      
+      return completedDuration;
+    }
+
+    // Regular single timer progress calculation
     const timeLeftSec = state.timeLeft / 1000;
     if (state.phase === 'prep') {
       return Math.max(0, settings.prepTime - timeLeftSec);
