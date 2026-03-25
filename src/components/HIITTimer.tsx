@@ -19,7 +19,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 const DEFAULT_SETTINGS: TimerSettings = {
-  prepTime: 10,
+  prepTime: 30,
   workTime: 30,
   restTime: 15,
   rounds: 4,
