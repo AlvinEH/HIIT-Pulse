@@ -223,7 +223,6 @@ export default function HIITTimer() {
 
   const displayRound = state.phase === 'prep' ? 0 : state.currentRound;
   
-    // Music State
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState<number>(0);
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
@@ -938,62 +937,64 @@ export default function HIITTimer() {
                 />
               </nav>
 
-              {/* Theme Selection */}
-              <div className="relative z-20 px-2 py-4 border-t border-[var(--border)]">
-                <div className="mb-3 px-4">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[var(--icon-secondary)]">Color Theme</span>
+              {/* Theme Selection - Hidden when header image is uploaded */}
+              {!headerImage && (
+                <div className="relative z-20 px-2 py-4 border-t border-[var(--border)]">
+                  <div className="mb-3 px-4">
+                    <span className="text-xs font-bold uppercase tracking-wider text-[var(--icon-secondary)]">Color Theme</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => setSelectedTheme('catppuccin')}
+                      className={cn(
+                        "p-3 rounded-lg text-xs font-medium transition-all flex items-center gap-2",
+                        selectedTheme === 'catppuccin' 
+                          ? "bg-[var(--accent)] text-white" 
+                          : "bg-[var(--surface-hover)] text-[var(--text)] hover:bg-[var(--border)]"
+                      )}
+                    >
+                      <div className={cn("w-3 h-3 rounded-full", selectedTheme === 'catppuccin' ? "bg-white" : "bg-[#cba6f7]")} />
+                      Catppuccin
+                    </button>
+                    <button
+                      onClick={() => setSelectedTheme('rose-pine')}
+                      className={cn(
+                        "p-3 rounded-lg text-xs font-medium transition-all flex items-center gap-2",
+                        selectedTheme === 'rose-pine' 
+                          ? "bg-[var(--accent)] text-white" 
+                          : "bg-[var(--surface-hover)] text-[var(--text)] hover:bg-[var(--border)]"
+                      )}
+                    >
+                      <div className={cn("w-3 h-3 rounded-full", selectedTheme === 'rose-pine' ? "bg-white" : "bg-[#c4a7e7]")} />
+                      Rose Pine
+                    </button>
+                    <button
+                      onClick={() => setSelectedTheme('gruvbox')}
+                      className={cn(
+                        "p-3 rounded-lg text-xs font-medium transition-all flex items-center gap-2",
+                        selectedTheme === 'gruvbox' 
+                          ? "bg-[var(--accent)] text-white" 
+                          : "bg-[var(--surface-hover)] text-[var(--text)] hover:bg-[var(--border)]"
+                      )}
+                    >
+                      <div className={cn("w-3 h-3 rounded-full", selectedTheme === 'gruvbox' ? "bg-white" : "bg-[#d3869b]")} />
+                      Gruvbox
+                    </button>
+                    <button
+                      onClick={() => setSelectedTheme('everforest')}
+                      className={cn(
+                        "p-3 rounded-lg text-xs font-medium transition-all flex items-center gap-2",
+                        selectedTheme === 'everforest' 
+                          ? "bg-[var(--accent)] text-white" 
+                          : "bg-[var(--surface-hover)] text-[var(--text)] hover:bg-[var(--border)]"
+                      )}
+                    >
+                      <div className={cn("w-3 h-3 rounded-full", selectedTheme === 'everforest' ? "bg-white" : "bg-[#a7c080]")} />
+                      Everforest
+                    </button>
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => setSelectedTheme('catppuccin')}
-                    className={cn(
-                      "p-3 rounded-lg text-xs font-medium transition-all flex items-center gap-2",
-                      selectedTheme === 'catppuccin' 
-                        ? "bg-[var(--accent)] text-white" 
-                        : "bg-[var(--surface-hover)] text-[var(--text)] hover:bg-[var(--border)]"
-                    )}
-                  >
-                    <div className={cn("w-3 h-3 rounded-full", selectedTheme === 'catppuccin' ? "bg-white" : "bg-[#cba6f7]")} />
-                    Catppuccin
-                  </button>
-                  <button
-                    onClick={() => setSelectedTheme('rose-pine')}
-                    className={cn(
-                      "p-3 rounded-lg text-xs font-medium transition-all flex items-center gap-2",
-                      selectedTheme === 'rose-pine' 
-                        ? "bg-[var(--accent)] text-white" 
-                        : "bg-[var(--surface-hover)] text-[var(--text)] hover:bg-[var(--border)]"
-                    )}
-                  >
-                    <div className={cn("w-3 h-3 rounded-full", selectedTheme === 'rose-pine' ? "bg-white" : "bg-[#c4a7e7]")} />
-                    Rose Pine
-                  </button>
-                  <button
-                    onClick={() => setSelectedTheme('gruvbox')}
-                    className={cn(
-                      "p-3 rounded-lg text-xs font-medium transition-all flex items-center gap-2",
-                      selectedTheme === 'gruvbox' 
-                        ? "bg-[var(--accent)] text-white" 
-                        : "bg-[var(--surface-hover)] text-[var(--text)] hover:bg-[var(--border)]"
-                    )}
-                  >
-                    <div className={cn("w-3 h-3 rounded-full", selectedTheme === 'gruvbox' ? "bg-white" : "bg-[#d3869b]")} />
-                    Gruvbox
-                  </button>
-                  <button
-                    onClick={() => setSelectedTheme('everforest')}
-                    className={cn(
-                      "p-3 rounded-lg text-xs font-medium transition-all flex items-center gap-2",
-                      selectedTheme === 'everforest' 
-                        ? "bg-[var(--accent)] text-white" 
-                        : "bg-[var(--surface-hover)] text-[var(--text)] hover:bg-[var(--border)]"
-                    )}
-                  >
-                    <div className={cn("w-3 h-3 rounded-full", selectedTheme === 'everforest' ? "bg-white" : "bg-[#a7c080]")} />
-                    Everforest
-                  </button>
-                </div>
-              </div>
+              )}
 
               <div className="relative z-20 p-6 border-t border-[var(--border)]">
                 <SidebarButton 
