@@ -93,6 +93,9 @@ export default function HIITTimer() {
   const [currentWorkoutStep, setCurrentWorkoutStep] = useState(0);
   const [newWorkoutName, setNewWorkoutName] = useState('');
   const [newWorkoutSteps, setNewWorkoutSteps] = useState<WorkoutStep[]>([]);
+  const [editingWorkoutId, setEditingWorkoutId] = useState<number | null>(null);
+  const [editingWorkoutName, setEditingWorkoutName] = useState('');
+  const [editingWorkoutSteps, setEditingWorkoutSteps] = useState<WorkoutStep[]>([]);
 
   // Prefetch and cache theme color values to ensure seamless transitions
   // and availability for JS-driven animations if needed
@@ -557,10 +560,22 @@ export default function HIITTimer() {
         playPhaseTransition(false, soundVolume, soundType);
       } else if (prev.phase === 'work') {
         if (prev.currentRound >= settings.rounds) {
-          nextPhase = 'finished';
-          nextTime = 0;
-          // play three short beeps on workout completion
-          playTripleBeep();
+          // Check if we're in workout mode and not on the final step
+          const isWorkoutMode = isRunningWorkout && currentWorkout;
+          const isFinalWorkoutStep = isWorkoutMode ? 
+            (currentWorkoutStep + 1 >= currentWorkout!.steps.length) : false;
+          
+          if (isWorkoutMode && !isFinalWorkoutStep) {
+            // In workout mode but not final step - transition to 'workoutStepComplete' instead of 'finished'
+            nextPhase = 'workoutStepComplete';
+            nextTime = 0;
+            playTripleBeep();
+          } else {
+            // Either not in workout mode, or this is the final step - show finished as normal
+            nextPhase = 'finished';
+            nextTime = 0;
+            playTripleBeep();
+          }
         } else {
           nextPhase = 'rest';
           nextTime = settings.restTime * 1000;
@@ -578,13 +593,13 @@ export default function HIITTimer() {
         phase: nextPhase,
         currentRound: nextRound,
         timeLeft: nextTime,
-        isActive: nextPhase !== 'finished',
+        isActive: nextPhase !== 'finished' && nextPhase !== 'workoutStepComplete',
       };
     });
-  }, [settings.workTime, settings.restTime, settings.rounds, soundVolume, soundType, playPhaseTransition, playTripleBeep]);
+  }, [settings.workTime, settings.restTime, settings.rounds, soundVolume, soundType, playPhaseTransition, playTripleBeep, isRunningWorkout, currentWorkout, currentWorkoutStep]);
 
   const toggleTimer = () => {
-    if (state.phase === 'finished') {
+    if (state.phase === 'finished' || state.phase === 'workoutStepComplete') {
       resetTimer();
     } else {
       setState((prev) => {
@@ -798,6 +813,10 @@ export default function HIITTimer() {
         if (type === 'bg') return 'bg-[var(--phase-finished)]';
         if (type === 'border') return 'border-[var(--phase-finished)]';
         return 'text-[var(--phase-finished)]';
+      case 'workoutStepComplete':
+        if (type === 'bg') return 'bg-[var(--phase-finished)]';
+        if (type === 'border') return 'border-[var(--phase-finished)]';
+        return 'text-[var(--phase-finished)]';
       default: return type === 'text' ? 'text-[var(--text)]' : '';
     }
   };
@@ -808,6 +827,7 @@ export default function HIITTimer() {
       case 'work': return 'WORK';
       case 'rest': return 'REST';
       case 'finished': return 'FINISHED';
+      case 'workoutStepComplete': return 'SET COMPLETE';
       default: return '';
     }
   };
@@ -835,33 +855,29 @@ export default function HIITTimer() {
 
   // Handle workout progression when a timer completes
   useEffect(() => {
-    if (state.phase === 'finished' && isRunningWorkout && currentWorkout) {
+    if ((state.phase === 'finished' || state.phase === 'workoutStepComplete') && isRunningWorkout && currentWorkout) {
       const nextStepIndex = currentWorkoutStep + 1;
       
       if (nextStepIndex < currentWorkout.steps.length) {
-        // Move to next step after a short delay
-        const timeout = setTimeout(() => {
-          setCurrentWorkoutStep(nextStepIndex);
-          
-          // Load the next set's timer settings
-          const nextSet = currentWorkout.steps[nextStepIndex];
-          const stepTimer = nextSet.timerId 
-            ? savedTimers.find(t => t.id === nextSet.timerId)
-            : null;
-          
-          if (stepTimer || nextSet.customSettings) {
-            const stepSettings = stepTimer || nextSet.customSettings!;
-            setSettings(stepSettings);
-            setState({
-              phase: 'prep',
-              currentRound: 1,
-              timeLeft: stepSettings.prepTime * 1000,
-              isActive: true
-            });
-          }
-        }, 2000); // 2 second delay between steps
-
-        return () => clearTimeout(timeout);
+        // Move to next step immediately
+        setCurrentWorkoutStep(nextStepIndex);
+        
+        // Load the next set's timer settings
+        const nextSet = currentWorkout.steps[nextStepIndex];
+        const stepTimer = nextSet.timerId 
+          ? savedTimers.find(t => t.id === nextSet.timerId)
+          : null;
+        
+        if (stepTimer || nextSet.customSettings) {
+          const stepSettings = stepTimer || nextSet.customSettings!;
+          setSettings(stepSettings);
+          setState({
+            phase: 'prep',
+            currentRound: 1,
+            timeLeft: stepSettings.prepTime * 1000,
+            isActive: true
+          });
+        }
       } else {
         // Workout complete
         const timeout = setTimeout(() => {
@@ -911,6 +927,54 @@ export default function HIITTimer() {
     const updatedWorkouts = savedWorkouts.filter(w => w.id !== workoutId);
     saveWorkoutsToStorage(updatedWorkouts);
   }, [savedWorkouts, saveWorkoutsToStorage]);
+
+  const editWorkout = useCallback((workout: Workout) => {
+    setEditingWorkoutId(workout.id);
+    setEditingWorkoutName(workout.name);
+    setEditingWorkoutSteps([...workout.steps]);
+    setShowSavedWorkoutsModal(false);
+  }, []);
+
+  const saveEditedWorkout = useCallback(() => {
+    if (!editingWorkoutName.trim() || editingWorkoutSteps.length === 0 || !editingWorkoutId) return;
+
+    const updatedWorkouts = savedWorkouts.map(workout => {
+      if (workout.id === editingWorkoutId) {
+        return {
+          ...workout,
+          name: editingWorkoutName.trim(),
+          steps: editingWorkoutSteps
+        };
+      }
+      return workout;
+    });
+
+    saveWorkoutsToStorage(updatedWorkouts);
+    setEditingWorkoutId(null);
+    setEditingWorkoutName('');
+    setEditingWorkoutSteps([]);
+    setShowSavedWorkoutsModal(true);
+  }, [editingWorkoutId, editingWorkoutName, editingWorkoutSteps, savedWorkouts, saveWorkoutsToStorage]);
+
+  const cancelEditWorkout = useCallback(() => {
+    setEditingWorkoutId(null);
+    setEditingWorkoutName('');
+    setEditingWorkoutSteps([]);
+    setShowSavedWorkoutsModal(true);
+  }, []);
+
+  const addTimerToEditingWorkout = useCallback((timer: SavedTimer) => {
+    const newStep: WorkoutStep = {
+      id: Date.now() + Math.random(),
+      timerId: timer.id,
+      name: timer.name
+    };
+    setEditingWorkoutSteps(prev => [...prev, newStep]);
+  }, []);
+
+  const removeStepFromEditingWorkout = useCallback((stepId: number) => {
+    setEditingWorkoutSteps(prev => prev.filter(step => step.id !== stepId));
+  }, []);
 
   const startWorkout = useCallback((workout: Workout) => {
     if (workout.steps.length === 0) return;
@@ -1279,27 +1343,42 @@ export default function HIITTimer() {
             <span className={cn("text-xs font-mono tracking-[0.3em] mb-2", getPhaseColor(state.phase))}>
               {getPhaseLabel(state.phase)}
             </span>
-            {state.phase === 'finished' ? (
+            {(state.phase === 'finished' || state.phase === 'workoutStepComplete') ? (
               <div className="w-[80%] flex items-center justify-center">
-                <svg viewBox="0 0 100 35" className="w-full h-auto">
-                  <text
-                    x="50%"
-                    y="50%"
-                    dominantBaseline="central"
-                    textAnchor="middle"
-                    className="fill-current font-light tracking-tighter"
-                    style={{ fontSize: '32px' }}
-                  >
-                    DONE
-                  </text>
-                </svg>
+                {state.phase === 'finished' ? (
+                  <svg viewBox="0 0 100 35" className="w-full h-auto">
+                    <text
+                      x="50%"
+                      y="50%"
+                      dominantBaseline="central"
+                      textAnchor="middle"
+                      className="fill-current font-light tracking-tighter"
+                      style={{ fontSize: '32px' }}
+                    >
+                      DONE
+                    </text>
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 200 35" className="w-full h-auto">
+                    <text
+                      x="50%"
+                      y="50%"
+                      dominantBaseline="central"
+                      textAnchor="middle"
+                      className="fill-current font-light tracking-tighter"
+                      style={{ fontSize: '24px' }}
+                    >
+                      NEXT SET...
+                    </text>
+                  </svg>
+                )}
               </div>
             ) : (
               <span className="text-[110px] font-light leading-none tracking-tighter tabular-nums">
                 {formatTime(Math.ceil(state.timeLeft / 1000))}
               </span>
             )}
-            {state.phase !== 'finished' && (
+            {(state.phase !== 'finished' && state.phase !== 'workoutStepComplete') && (
               <span className="text-[var(--icon-secondary)] text-sm mt-4 tracking-widest uppercase">
                 Round {displayRound} / {settings.rounds}
               </span>
@@ -2159,6 +2238,134 @@ export default function HIITTimer() {
         )}
       </AnimatePresence>
 
+      {/* Edit Workout Modal */}
+      <AnimatePresence>
+        {editingWorkoutId !== null && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => cancelEditWorkout()}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-2xl max-h-[80vh] bg-[var(--surface)] border border-[var(--border)] rounded-2xl shadow-2xl z-[70] flex flex-col overflow-hidden"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
+                <h2 className="text-xl font-bold text-[var(--text)]">Edit Workout</h2>
+                <button
+                  onClick={() => cancelEditWorkout()}
+                  className="p-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6">
+                <div className="space-y-4">
+                  {/* Workout Name Input */}
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text)] mb-2">
+                      Workout Name <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={editingWorkoutName}
+                      onChange={(e) => setEditingWorkoutName(e.target.value)}
+                      placeholder="Enter workout name"
+                      required
+                      className={`w-full px-3 py-2 bg-[var(--bg)] border rounded-lg text-[var(--text)] placeholder-[var(--text-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] ${
+                        editingWorkoutName.trim() === '' ? 'border-red-400/50' : 'border-[var(--border)]'
+                      }`}
+                    />
+                  </div>
+
+                  {/* Timer Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text)] mb-2">
+                      Add Timer Steps
+                    </label>
+                    <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                      {savedTimers.map(timer => (
+                        <button
+                          key={timer.id}
+                          onClick={() => addTimerToEditingWorkout(timer)}
+                          className="p-3 bg-[var(--bg)] hover:bg-[var(--surface-hover)] border border-[var(--border)] rounded-lg text-left transition-colors"
+                        >
+                          <div className="font-medium text-[var(--text)]">{timer.name}</div>
+                          <div className="text-xs text-[var(--text-secondary)] space-y-1">
+                            <div>{timer.prepTime}s Prep • {timer.workTime}s Work</div>
+                            <div>{timer.restTime}s Rest • {timer.rounds} Rounds</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Current Workout Steps */}
+                  <div>
+                    <label className="block text-sm font-medium text-[var(--text)] mb-2">
+                      Workout Steps ({editingWorkoutSteps.length})
+                    </label>
+                    <div className="space-y-2 min-h-[100px] p-3 bg-[var(--bg)] border border-[var(--border)] rounded-lg">
+                      {editingWorkoutSteps.length === 0 ? (
+                        <div className="text-center text-[var(--text-secondary)]">
+                          Click on saved timers above to add them to your workout
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {editingWorkoutSteps.map((step, index) => (
+                            <div key={step.id} className="flex items-center justify-between p-2 bg-[var(--surface)] border border-[var(--border)] rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <span className="text-xs font-mono text-[var(--text-secondary)] bg-[var(--bg)] px-2 py-1 rounded">
+                                  {index + 1}
+                                </span>
+                                <span className="text-[var(--text)] font-medium">
+                                  {step.name}
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => removeStepFromEditingWorkout(step.id)}
+                                className="p-1 text-[var(--text-secondary)] hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end gap-3 p-6 border-t border-[var(--border)]">
+                <button
+                  onClick={() => cancelEditWorkout()}
+                  className="px-4 py-2 text-[var(--text-secondary)] hover:text-[var(--text)] transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveEditedWorkout}
+                  disabled={!editingWorkoutName.trim() || editingWorkoutSteps.length === 0}
+                  className="px-4 py-2 bg-[var(--accent)] text-white rounded-lg hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* Saved Workouts Modal */}
       <AnimatePresence>
         {showSavedWorkoutsModal && (
@@ -2237,6 +2444,16 @@ export default function HIITTimer() {
                                 title="Start Workout"
                               >
                                 <Play size={16} />
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  editWorkout(workout);
+                                }}
+                                className="p-2 text-[var(--text-secondary)] hover:text-blue-500 transition-colors"
+                                title="Edit Workout"
+                              >
+                                <Pencil size={16} />
                               </button>
                               <button
                                 onClick={(e) => {

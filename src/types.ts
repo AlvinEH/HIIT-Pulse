@@ -1,4 +1,4 @@
-export type TimerPhase = 'prep' | 'work' | 'rest' | 'finished';
+export type TimerPhase = 'prep' | 'work' | 'rest' | 'finished' | 'workoutStepComplete';
 
 export type SoundType = 'beep' | 'bell' | 'whistle' | 'digital' | 'chime' | 'ding' | 'ping' | 'laser' | 'power-up' | 'notification';
 
