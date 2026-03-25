@@ -1,11 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
 @import "tailwindcss";
 
-@theme {
+:root {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
-  /* Catppuccin Mocha (Dark) - Default */
+  /* Catppuccin Colors */
   --color-ctp-rosewater: #f5e0dc;
   --color-ctp-flamingo: #f2cdcd;
   --color-ctp-pink: #f5c2e7;
@@ -32,9 +32,82 @@
   --color-ctp-base: #1e1e2e;
   --color-ctp-mantle: #181825;
   --color-ctp-crust: #11111b;
+
+  /* Rose Pine Colors */
+  --color-rp-base: #191724;
+  --color-rp-surface: #1f1d2e;
+  --color-rp-overlay: #26233a;
+  --color-rp-muted: #6e6a86;
+  --color-rp-subtle: #908caa;
+  --color-rp-text: #e0def4;
+  --color-rp-love: #eb6f92;
+  --color-rp-gold: #f6c177;
+  --color-rp-rose: #ebbcba;
+  --color-rp-pine: #31748f;
+  --color-rp-foam: #9ccfd8;
+  --color-rp-iris: #c4a7e7;
+  --color-rp-highlight-low: #21202e;
+  --color-rp-highlight-med: #403d52;
+  --color-rp-highlight-high: #524f67;
+
+  /* Gruvbox Colors */
+  --color-grv-bg0_h: #1d2021;
+  --color-grv-bg0: #282828;
+  --color-grv-bg1: #3c3836;
+  --color-grv-bg2: #504945;
+  --color-grv-bg3: #665c54;
+  --color-grv-bg4: #7c6f64;
+  --color-grv-fg0: #fbf1c7;
+  --color-grv-fg1: #ebdbb2;
+  --color-grv-fg2: #d5c4a1;
+  --color-grv-fg3: #bdae93;
+  --color-grv-fg4: #a89984;
+  --color-grv-red: #cc241d;
+  --color-grv-green: #98971a;
+  --color-grv-yellow: #d79921;
+  --color-grv-blue: #458588;
+  --color-grv-purple: #b16286;
+  --color-grv-aqua: #689d6a;
+  --color-grv-orange: #d65d0e;
+  --color-grv-gray: #928374;
+  --color-grv-red-bright: #fb4934;
+  --color-grv-green-bright: #b8bb26;
+  --color-grv-yellow-bright: #fabd2f;
+  --color-grv-blue-bright: #83a598;
+  --color-grv-purple-bright: #d3869b;
+  --color-grv-aqua-bright: #8ec07c;
+  --color-grv-orange-bright: #fe8019;
+
+  /* Everforest Colors */
+  --color-ef-bg_dim: #1e2326;
+  --color-ef-bg0: #272e33;
+  --color-ef-bg1: #2e383c;
+  --color-ef-bg2: #374145;
+  --color-ef-bg3: #414b50;
+  --color-ef-bg4: #495156;
+  --color-ef-bg5: #4f5b58;
+  --color-ef-fg: #d3c6aa;
+  --color-ef-red: #e67e80;
+  --color-ef-orange: #e69875;
+  --color-ef-yellow: #dbbc7f;
+  --color-ef-green: #a7c080;
+  --color-ef-aqua: #83c092;
+  --color-ef-blue: #7fbbb3;
+  --color-ef-purple: #d699b6;
+  --color-ef-grey0: #7a8478;
+  --color-ef-grey1: #859289;
+  --color-ef-grey2: #9da9a0;
+  --color-ef-statusline1: #a7c080;
+  --color-ef-statusline2: #d3c6aa;
+  --color-ef-statusline3: #e67e80;
 }
 
+/* ============================================================================
+   CATPPUCCIN THEME (DEFAULT)
+   ============================================================================ */
+   
 :root {
+  /* Catppuccin Mocha (Dark) - Default Theme */
   --bg: var(--color-ctp-base);
   --text: var(--color-ctp-text);
   --surface: var(--color-ctp-surface0);
@@ -51,6 +124,7 @@
   
   --icon-primary: var(--color-ctp-lavender);
   --icon-secondary: var(--color-ctp-subtext0);
+  --icon-hover: var(--color-ctp-rosewater);
 }
 
 .light-mode {
@@ -88,10 +162,139 @@
   --icon-secondary: #7c7f93;
 }
 
-@layer base {
-  html {
-  }
+/* ============================================================================
+   ROSE PINE THEME
+   ============================================================================ */
 
+.theme-rose-pine {
+  /* Rose Pine Main (Dark) */
+  --bg: var(--color-rp-base);
+  --text: var(--color-rp-text);
+  --surface: var(--color-rp-surface);
+  --surface-hover: var(--color-rp-overlay);
+  --border: var(--color-rp-highlight-med);
+  
+  --phase-prep: var(--color-rp-gold);
+  --phase-work: var(--color-rp-love);
+  --phase-rest: var(--color-rp-pine);
+  --phase-finished: var(--color-rp-iris);
+  
+  --accent: var(--color-rp-iris);
+  --accent-hover: var(--color-rp-foam);
+  
+  --icon-primary: var(--color-rp-iris);
+  --icon-secondary: var(--color-rp-muted);
+}
+
+.theme-rose-pine.light-mode {
+  /* Rose Pine Dawn (Light) */
+  --bg: #faf4ed;
+  --text: #575279;
+  --surface: #f2e9e1;
+  --surface-hover: #fffaf3;
+  --border: #dfdcdc;
+  
+  --phase-prep: #ea9d34;
+  --phase-work: #d7827e;
+  --phase-rest: #56949f;
+  --phase-finished: #907aa9;
+  
+  --accent: #907aa9;
+  --accent-hover: #56949f;
+  
+  --icon-primary: #907aa9;
+  --icon-secondary: #9893a5;
+}
+
+/* ============================================================================
+   GRUVBOX THEME
+   ============================================================================ */
+
+.theme-gruvbox {
+  /* Gruvbox Dark */
+  --bg: var(--color-grv-bg0);
+  --text: var(--color-grv-fg1);
+  --surface: var(--color-grv-bg1);
+  --surface-hover: var(--color-grv-bg2);
+  --border: var(--color-grv-bg3);
+  
+  --phase-prep: var(--color-grv-yellow-bright);
+  --phase-work: var(--color-grv-red-bright);
+  --phase-rest: var(--color-grv-aqua-bright);
+  --phase-finished: var(--color-grv-purple-bright);
+  
+  --accent: var(--color-grv-blue-bright);
+  --accent-hover: var(--color-grv-aqua-bright);
+  
+  --icon-primary: var(--color-grv-blue-bright);
+  --icon-secondary: var(--color-grv-gray);
+}
+
+.theme-gruvbox.light-mode {
+  /* Gruvbox Light */
+  --bg: #fbf1c7;
+  --text: #3c3836;
+  --surface: #f2e5bc;
+  --surface-hover: #ebdbb2;
+  --border: #d5c4a1;
+  
+  --phase-prep: #b57614;
+  --phase-work: #9d0006;
+  --phase-rest: #427b58;
+  --phase-finished: #8f3f71;
+  
+  --accent: #076678;
+  --accent-hover: #427b58;
+  
+  --icon-primary: #076678;
+  --icon-secondary: #7c6f64;
+}
+
+/* ============================================================================
+   EVERFOREST THEME
+   ============================================================================ */
+
+.theme-everforest {
+  /* Everforest Dark */
+  --bg: var(--color-ef-bg0);
+  --text: var(--color-ef-fg);
+  --surface: var(--color-ef-bg1);
+  --surface-hover: var(--color-ef-bg2);
+  --border: var(--color-ef-bg3);
+  
+  --phase-prep: var(--color-ef-yellow);
+  --phase-work: var(--color-ef-red);
+  --phase-rest: var(--color-ef-aqua);
+  --phase-finished: var(--color-ef-purple);
+  
+  --accent: var(--color-ef-green);
+  --accent-hover: var(--color-ef-aqua);
+  
+  --icon-primary: var(--color-ef-green);
+  --icon-secondary: var(--color-ef-grey1);
+}
+
+.theme-everforest.light-mode {
+  /* Everforest Light */
+  --bg: #fdf6e3;
+  --text: #5c6a72;
+  --surface: #f3efda;
+  --surface-hover: #edeada;
+  --border: #e6e2cc;
+  
+  --phase-prep: #dfa000;
+  --phase-work: #f85552;
+  --phase-rest: #35a77c;
+  --phase-finished: #df69ba;
+  
+  --accent: #8da101;
+  --accent-hover: #35a77c;
+  
+  --icon-primary: #8da101;
+  --icon-secondary: #a6b0a0;
+}
+
+@layer base {
   *, ::before, ::after {
     border-color: var(--border);
   }
@@ -99,7 +302,9 @@
   body {
     background-color: var(--bg);
     color: var(--text);
-    @apply antialiased overflow-x-hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
   }
 }
 

@@ -53,16 +53,17 @@ export default function HIITTimer() {
   const [savedTimers, setSavedTimers] = useState<SavedTimer[]>([]);
   const [editingTimerId, setEditingTimerId] = useState<number | null>(null);
   const [editingName, setEditingName] = useState('');
+  const [editingSettings, setEditingSettings] = useState<TimerSettings>(DEFAULT_SETTINGS);
   const [soundType, setSoundType] = useState<SoundType>(() => {
     return (localStorage.getItem('hiit-sound-type') as any) || 'beep';
   });
   const [soundVolume, setSoundVolume] = useState(() => {
     const saved = localStorage.getItem('hiit-sound-volume');
-    return saved !== null ? parseFloat(saved) : 0.8;
+    return saved !== null ? parseFloat(saved) : 0.9;
   });
   const [musicVolume, setMusicVolume] = useState(() => {
     const saved = localStorage.getItem('hiit-music-volume');
-    return saved !== null ? parseFloat(saved) : 0.3;
+    return saved !== null ? parseFloat(saved) : 0.2;
   });
   const [headerImage, setHeaderImage] = useState<string | null>(() => {
     return localStorage.getItem('hiit-header-image');
@@ -77,6 +78,10 @@ export default function HIITTimer() {
     if (saved) return saved === 'dark';
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
+  const [selectedTheme, setSelectedTheme] = useState<'catppuccin' | 'rose-pine' | 'gruvbox' | 'everforest'>(() => {
+    const saved = localStorage.getItem('hiit-pulse-color-theme');
+    return (saved as any) || 'catppuccin';
+  });
 
   // Prefetch and cache theme color values to ensure seamless transitions
   // and availability for JS-driven animations if needed
@@ -84,17 +89,56 @@ export default function HIITTimer() {
 
   const { playPhaseTransition, playBeep } = useAudio();
 
+  // Helper function to play beeps with music ducking
+  const playBeepWithMusicDucking = useCallback(async (frequency: number, duration: number, volume: number, soundType: SoundType) => {
+    const originalVolume = musicVolume;
+    const duckingVolume = originalVolume * 0.3; // Reduce music volume to 30% of original
+    
+    // Lower music volume if music is playing
+    if (audioRef.current && !audioRef.current.paused && originalVolume > 0) {
+      audioRef.current.volume = duckingVolume;
+    }
+    
+    // Play the beep
+    await playBeep(frequency, duration, volume, soundType);
+    
+    // Restore music volume after a short delay
+    setTimeout(() => {
+      if (audioRef.current && !audioRef.current.paused) {
+        audioRef.current.volume = originalVolume;
+      }
+    }, (duration * 1000) + 100); // Restore 100ms after beep ends
+  }, [musicVolume, playBeep]);
+
   useEffect(() => {
     localStorage.setItem('hiit-pulse-theme', isDarkMode ? 'dark' : 'light');
-    if (isDarkMode) {
-      document.documentElement.classList.remove('light-mode');
-    } else {
-      document.documentElement.classList.add('light-mode');
+    localStorage.setItem('hiit-pulse-color-theme', selectedTheme);
+    
+    // Apply theme classes
+    const root = document.documentElement;
+    
+    // Remove all theme classes
+    root.classList.remove('light-mode', 'theme-rose-pine', 'theme-gruvbox', 'theme-everforest');
+    
+    // Apply light/dark mode
+    if (!isDarkMode) {
+      root.classList.add('light-mode');
+    }
+    
+    // Apply color theme (only if no dynamic theming from image)
+    if (!headerImage) {
+      if (selectedTheme === 'rose-pine') {
+        root.classList.add('theme-rose-pine');
+      } else if (selectedTheme === 'gruvbox') {
+        root.classList.add('theme-gruvbox');
+      } else if (selectedTheme === 'everforest') {
+        root.classList.add('theme-everforest');
+      }
+      // catppuccin is default, no class needed
     }
 
     // Cache the current theme colors after the class has been applied
     // This ensures that any JS-driven animations have immediate access to the correct colors
-    const root = document.documentElement;
     const styles = getComputedStyle(root);
     setThemeCache({
       bg: styles.getPropertyValue('--bg').trim(),
@@ -105,12 +149,12 @@ export default function HIITTimer() {
       rest: styles.getPropertyValue('--phase-rest').trim(),
       finished: styles.getPropertyValue('--phase-finished').trim(),
     });
-  }, [isDarkMode]);
+  }, [isDarkMode, selectedTheme, headerImage]);
 
   // Material 3 Dynamic Theming
   useEffect(() => {
     if (!headerImage) {
-      // Reset to Catppuccin defaults if no image
+      // Reset to selected theme defaults if no image
       document.documentElement.style.removeProperty('--bg');
       document.documentElement.style.removeProperty('--text');
       document.documentElement.style.removeProperty('--surface');
@@ -118,11 +162,25 @@ export default function HIITTimer() {
       document.documentElement.style.removeProperty('--border');
       document.documentElement.style.removeProperty('--accent');
       document.documentElement.style.removeProperty('--accent-hover');
+      
+      // Reapply selected theme classes
+      const root = document.documentElement;
+      root.classList.remove('theme-rose-pine', 'theme-gruvbox', 'theme-everforest');
+      if (selectedTheme === 'rose-pine') {
+        root.classList.add('theme-rose-pine');
+      } else if (selectedTheme === 'gruvbox') {
+        root.classList.add('theme-gruvbox');
+      } else if (selectedTheme === 'everforest') {
+        root.classList.add('theme-everforest');
+      }
       return;
     }
 
     const applyTheme = (scheme: any) => {
       const root = document.documentElement;
+      // Remove theme classes when applying dynamic colors
+      root.classList.remove('theme-rose-pine', 'theme-gruvbox', 'theme-everforest');
+      
       root.style.setProperty('--bg', hexFromArgb(scheme.surfaceContainerLowest));
       root.style.setProperty('--text', hexFromArgb(scheme.onSurface));
       root.style.setProperty('--surface', hexFromArgb(scheme.surfaceContainerLow));
@@ -182,7 +240,7 @@ export default function HIITTimer() {
     };
 
     updateThemeFromImage();
-  }, [headerImage, isDarkMode, cachedThemeColors]);
+  }, [headerImage, isDarkMode, cachedThemeColors, selectedTheme]);
 
   const displayRound = state.phase === 'prep' ? 0 : state.currentRound;
 
@@ -222,8 +280,8 @@ export default function HIITTimer() {
 
   const handleEdgeTouchStart = (e: React.TouchEvent) => {
     const touch = e.touches[0];
-    // Only start tracking if touch begins in the leftmost 70px to avoid interfering with buttons
-    if (touch.clientX > 70) return;
+    // Only start tracking if touch begins in the leftmost 20px to avoid interfering with buttons
+    if (touch.clientX > 20) return;
     touchStartXRef.current = touch.clientX;
     touchStartYRef.current = touch.clientY;
   };
@@ -236,7 +294,7 @@ export default function HIITTimer() {
     const dy = touch.clientY - (touchStartYRef.current ?? 0);
 
     // Swipe right from the left edge with a mostly horizontal gesture
-    if (dx > 20 && Math.abs(dy) < 80) {
+    if (dx > 40 && Math.abs(dy) < 80) {
       setShowSidebar(true);
       touchStartXRef.current = null;
       touchStartYRef.current = null;
@@ -356,6 +414,47 @@ export default function HIITTimer() {
     }
   };
 
+  const editTimer = (timer: SavedTimer) => {
+    setEditingTimerId(timer.id);
+    setEditingSettings({
+      prepTime: timer.prepTime,
+      workTime: timer.workTime,
+      restTime: timer.restTime,
+      rounds: timer.rounds,
+    });
+    setEditingName(timer.name);
+  };
+
+  const saveEditedTimer = (id: number) => {
+    if (!editingName.trim()) {
+      setEditingTimerId(null);
+      return;
+    }
+    try {
+      const saved = localStorage.getItem('hiit-saved-timers');
+      const existingTimers: SavedTimer[] = saved ? JSON.parse(saved) : [];
+      const updatedTimers = existingTimers.map(t => 
+        t.id === id ? {
+          ...t,
+          name: editingName.trim(),
+          prepTime: editingSettings.prepTime,
+          workTime: editingSettings.workTime,
+          restTime: editingSettings.restTime,
+          rounds: editingSettings.rounds,
+        } : t
+      );
+      localStorage.setItem('hiit-saved-timers', JSON.stringify(updatedTimers));
+      setEditingTimerId(null);
+      fetchTimers();
+    } catch (error) {
+      console.error('Failed to save edited timer:', error);
+    }
+  };
+
+  const cancelEditTimer = () => {
+    setEditingTimerId(null);
+  };
+
   const setDefaultTimer = (id: number, isDefault: boolean) => {
     try {
       const saved = localStorage.getItem('hiit-saved-timers');
@@ -424,7 +523,7 @@ export default function HIITTimer() {
           if (prev.phase === 'work') {
             const halfPointMs = (settings.workTime * 1000) / 2;
             if (prev.timeLeft > halfPointMs && nextTime <= halfPointMs && !halfwayPlayedRef.current) {
-              playBeep(880, 0.08, soundVolume, soundType);
+              playBeepWithMusicDucking(880, 0.08, soundVolume, soundType);
               halfwayPlayedRef.current = true;
             }
           }
@@ -433,7 +532,7 @@ export default function HIITTimer() {
           const nextSec = Math.ceil(nextTime / 1000);
           
           if (prevSec !== nextSec && nextSec <= 3 && nextSec > 0) {
-            playBeep(330, 0.05, soundVolume, soundType);
+            playBeepWithMusicDucking(330, 0.05, soundVolume, soundType);
           }
           return { ...prev, timeLeft: nextTime };
         });
@@ -443,7 +542,7 @@ export default function HIITTimer() {
     }
 
     return () => clearInterval(interval);
-  }, [state.isActive, settings.workTime, soundVolume, soundType, playBeep]);
+  }, [state.isActive, settings.workTime, soundVolume, soundType, playBeepWithMusicDucking]);
   
   // Reset halfway flag whenever the phase, round or work duration changes
   useEffect(() => {
@@ -453,10 +552,10 @@ export default function HIITTimer() {
   const playTripleBeep = useCallback((count = 3, intervalMs = 100) => {
     for (let i = 0; i < count; i++) {
       setTimeout(() => {
-        playBeep(880, 0.08, soundVolume, soundType);
+        playBeepWithMusicDucking(880, 0.08, soundVolume, soundType);
       }, i * intervalMs);
     }
-  }, [playBeep, soundVolume, soundType]);
+  }, [playBeepWithMusicDucking, soundVolume, soundType]);
 
   const handlePhaseTransition = useCallback(() => {
     setState((prev) => {
@@ -861,6 +960,63 @@ export default function HIITTimer() {
                 />
               </nav>
 
+              {/* Theme Selection */}
+              <div className="relative z-20 px-2 py-4 border-t border-[var(--border)]">
+                <div className="mb-3 px-4">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[var(--icon-secondary)]">Color Theme</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => setSelectedTheme('catppuccin')}
+                    className={cn(
+                      "p-3 rounded-lg text-xs font-medium transition-all flex items-center gap-2",
+                      selectedTheme === 'catppuccin' 
+                        ? "bg-[var(--accent)] text-white" 
+                        : "bg-[var(--surface-hover)] text-[var(--text)] hover:bg-[var(--border)]"
+                    )}
+                  >
+                    <div className={cn("w-3 h-3 rounded-full", selectedTheme === 'catppuccin' ? "bg-white" : "bg-[#cba6f7]")} />
+                    Catppuccin
+                  </button>
+                  <button
+                    onClick={() => setSelectedTheme('rose-pine')}
+                    className={cn(
+                      "p-3 rounded-lg text-xs font-medium transition-all flex items-center gap-2",
+                      selectedTheme === 'rose-pine' 
+                        ? "bg-[var(--accent)] text-white" 
+                        : "bg-[var(--surface-hover)] text-[var(--text)] hover:bg-[var(--border)]"
+                    )}
+                  >
+                    <div className={cn("w-3 h-3 rounded-full", selectedTheme === 'rose-pine' ? "bg-white" : "bg-[#c4a7e7]")} />
+                    Rose Pine
+                  </button>
+                  <button
+                    onClick={() => setSelectedTheme('gruvbox')}
+                    className={cn(
+                      "p-3 rounded-lg text-xs font-medium transition-all flex items-center gap-2",
+                      selectedTheme === 'gruvbox' 
+                        ? "bg-[var(--accent)] text-white" 
+                        : "bg-[var(--surface-hover)] text-[var(--text)] hover:bg-[var(--border)]"
+                    )}
+                  >
+                    <div className={cn("w-3 h-3 rounded-full", selectedTheme === 'gruvbox' ? "bg-white" : "bg-[#d3869b]")} />
+                    Gruvbox
+                  </button>
+                  <button
+                    onClick={() => setSelectedTheme('everforest')}
+                    className={cn(
+                      "p-3 rounded-lg text-xs font-medium transition-all flex items-center gap-2",
+                      selectedTheme === 'everforest' 
+                        ? "bg-[var(--accent)] text-white" 
+                        : "bg-[var(--surface-hover)] text-[var(--text)] hover:bg-[var(--border)]"
+                    )}
+                  >
+                    <div className={cn("w-3 h-3 rounded-full", selectedTheme === 'everforest' ? "bg-white" : "bg-[#a7c080]")} />
+                    Everforest
+                  </button>
+                </div>
+              </div>
+
               <div className="relative z-20 p-6 border-t border-[var(--border)]">
                 <SidebarButton 
                   icon={isDarkMode ? <Sun size={20} className="text-[var(--phase-prep)]" /> : <Moon size={20} className="text-[var(--accent)]" />} 
@@ -890,7 +1046,7 @@ export default function HIITTimer() {
 
       {/* Main Timer Display */}
       <div className="relative w-full max-w-md aspect-square flex flex-col items-center justify-center p-4">
-        {/* Slide-from-left trigger area - limited to progress circles height */}
+        {/* Slide-from-left trigger area - limited to progress circles height, extends to right edge of menu icon */}
         <div 
           className="absolute top-0 left-0 bottom-0 w-17 z-10 cursor-e-resize"
           onMouseEnter={() => !showSidebar && setShowSidebar(true)}
@@ -959,7 +1115,7 @@ export default function HIITTimer() {
               fill="none"
               stroke="currentColor"
               strokeWidth="12"
-              strokeDasharray="100"
+              strokeDasharray="100 100"
               pathLength="100"
               animate={{ 
                 strokeDashoffset: 100 - (state.timeLeft / (
@@ -980,7 +1136,7 @@ export default function HIITTimer() {
             r="43%"
             fill="none"
             stroke="currentColor"
-            strokeWidth="4"
+            strokeWidth="6"
             className="text-[var(--surface)]/50"
           />
           
@@ -991,7 +1147,7 @@ export default function HIITTimer() {
             r="43%"
             fill="none"
             stroke="currentColor"
-            strokeWidth="4"
+            strokeWidth="6"
             strokeDasharray="100 100"
             pathLength="100"
             animate={{ strokeDashoffset: 100 - totalProgress * 100 }}
@@ -1273,6 +1429,7 @@ export default function HIITTimer() {
                   value={settings.restTime} 
                   onChange={(v) => setSettings(s => ({...s, restTime: v}))} 
                   unit="s"
+                  minValue={0}
                 />
                 <SettingRow 
                   label="Rounds" 
@@ -1307,6 +1464,8 @@ export default function HIITTimer() {
           </motion.div>
         )}
       </AnimatePresence>
+
+
 
       {/* Audio Settings Modal */}
       <AnimatePresence>
@@ -1518,38 +1677,72 @@ export default function HIITTimer() {
                     <p>No saved timers yet.</p>
                   </div>
                 ) : (
-                  savedTimers.map((timer) => (
+                  (editingTimerId ? savedTimers.filter(timer => timer.id === editingTimerId) : savedTimers).map((timer) => (
                     <div 
                       key={timer.id}
                       className="group relative rounded-2xl bg-[var(--surface-hover)]/50 border border-[var(--border)] hover:border-[var(--border-hover)] transition-all overflow-hidden"
                     >
                       {editingTimerId === timer.id ? (
-                        <div className="w-full pl-2 pr-4 py-3 flex gap-2 items-center">
-                          <input
-                            autoFocus
-                            type="text"
-                            value={editingName}
-                            onChange={(e) => setEditingName(e.target.value)}
-                            autoCapitalize="words"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') renameTimer(timer.id);
-                              if (e.key === 'Escape') setEditingTimerId(null);
-                            }}
-                            onBlur={(e) => {
-                              // Only save on blur if we didn't click the checkmark button
-                              if (e.relatedTarget && (e.relatedTarget as HTMLElement).id === `save-name-${timer.id}`) return;
-                              renameTimer(timer.id);
-                            }}
-                            className="flex-1 bg-transparent border-none px-2 py-1 text-sm focus:outline-none min-w-0 font-medium text-[var(--text)]"
-                          />
-                          <button
-                            id={`save-name-${timer.id}`}
-                            onClick={() => renameTimer(timer.id)}
-                            className="p-1.5 text-[var(--accent)] hover:bg-[var(--accent)]/10 rounded-lg transition-colors flex-shrink-0"
-                            title="Save name"
-                          >
-                            <Check size={18} />
-                          </button>
+                        <div className="w-full p-4 space-y-4">
+                          {/* Timer Name Input */}
+                          <div className="flex gap-2 items-center mb-4">
+                            <input
+                              autoFocus
+                              type="text"
+                              value={editingName}
+                              onChange={(e) => setEditingName(e.target.value)}
+                              autoCapitalize="words"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') saveEditedTimer(timer.id);
+                                if (e.key === 'Escape') cancelEditTimer();
+                              }}
+                              className="flex-1 bg-[var(--surface-hover)] border border-[var(--border)] rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-[var(--accent)] text-[var(--text)] font-medium"
+                              placeholder="Timer Name"
+                            />
+                            <button
+                              onClick={() => saveEditedTimer(timer.id)}
+                              disabled={!editingName.trim()}
+                              className="p-2 rounded-xl bg-[var(--accent)] text-[var(--bg)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--accent-hover)] transition-colors flex-shrink-0"
+                              title="Save changes"
+                            >
+                              <Check size={18} />
+                            </button>
+                            <button
+                              onClick={cancelEditTimer}
+                              className="p-2 rounded-xl bg-[var(--surface-hover)] text-[var(--text)] hover:bg-[var(--border)] transition-colors flex-shrink-0"
+                              title="Cancel"
+                            >
+                              <X size={18} />
+                            </button>
+                          </div>
+
+                          {/* Settings Grid */}
+                          <div className="grid grid-cols-[1fr_40px_48px_40px] gap-y-2 gap-x-0 items-center">
+                            <SettingRow 
+                              label="Prepare" 
+                              value={editingSettings.prepTime} 
+                              onChange={(v) => setEditingSettings(s => ({...s, prepTime: v}))} 
+                              unit="s"
+                            />
+                            <SettingRow 
+                              label="Work" 
+                              value={editingSettings.workTime} 
+                              onChange={(v) => setEditingSettings(s => ({...s, workTime: v}))} 
+                              unit="s"
+                            />
+                            <SettingRow 
+                              label="Rest" 
+                              value={editingSettings.restTime} 
+                              onChange={(v) => setEditingSettings(s => ({...s, restTime: v}))} 
+                              unit="s"
+                              minValue={0}
+                            />
+                            <SettingRow 
+                              label="Rounds" 
+                              value={editingSettings.rounds} 
+                              onChange={(v) => setEditingSettings(s => ({...s, rounds: v}))} 
+                            />
+                          </div>
                         </div>
                       ) : (
                         <div className="relative p-4">
@@ -1587,11 +1780,10 @@ export default function HIITTimer() {
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setEditingTimerId(timer.id);
-                                    setEditingName(timer.name);
+                                    editTimer(timer);
                                   }}
                                   className="p-2 text-[var(--icon-secondary)]/40 hover:text-[var(--text)] hover:bg-[var(--surface-hover)] group-hover:opacity-100 transition-all rounded-lg"
-                                  title="Rename timer"
+                                  title="Edit timer"
                                 >
                                   <Pencil size={16} />
                                 </button>
@@ -1657,7 +1849,7 @@ function SidebarButton({ icon, label, onClick }: SidebarButtonProps) {
   );
 }
 
-function SettingRow({ label, value, onChange, unit = '' }: { label: string, value: number, onChange: (v: number) => void, unit?: string }) {
+function SettingRow({ label, value, onChange, unit = '', minValue = 1 }: { label: string, value: number, onChange: (v: number) => void, unit?: string, minValue?: number }) {
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(value.toString());
 
@@ -1668,8 +1860,12 @@ function SettingRow({ label, value, onChange, unit = '' }: { label: string, valu
   const handleBlur = () => {
     setIsEditing(false);
     const num = parseInt(inputValue);
-    if (!isNaN(num) && num > 0) {
+    if (!isNaN(num) && num >= minValue) {
       onChange(num);
+    } else if (inputValue.trim() === '') {
+      // Set to 0 if field is cleared
+      onChange(0);
+      setInputValue('0');
     } else {
       setInputValue(value.toString());
     }
@@ -1687,7 +1883,7 @@ function SettingRow({ label, value, onChange, unit = '' }: { label: string, valu
       
       <div className="">
         <button 
-          onClick={() => onChange(Math.max(1, value - 1))}
+          onClick={() => onChange(Math.max(minValue, value - 1))}
           className="w-10 h-10 flex items-center justify-center text-[var(--icon-secondary)] hover:text-[var(--text)] transition-colors"
         >
           <ChevronDown size={18} />
