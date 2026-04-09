@@ -59,7 +59,7 @@ export default function HIITTimer() {
   });
   const [soundVolume, setSoundVolume] = useState(() => {
     const saved = localStorage.getItem('hiit-sound-volume');
-    return saved !== null ? parseFloat(saved) : 0.9;
+    return saved !== null ? parseFloat(saved) : 1.2;
   });
   const [musicVolume, setMusicVolume] = useState(() => {
     const saved = localStorage.getItem('hiit-music-volume');
@@ -1820,7 +1820,7 @@ export default function HIITTimer() {
                     <input 
                       type="range"
                       min="0"
-                      max="1"
+                      max="1.5"
                       step="0.01"
                       value={soundVolume}
                       onChange={(e) => {
